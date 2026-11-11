@@ -32,7 +32,7 @@
 
 | 파일 | 설명 |
 |---|---|
-| `heesoo-help-request-alerts.patch` | K9 콘솔에 적용하는 변경 사항 전체 (`git am`으로 적용). 모듈 5개, 연결 코드, 테스트, 평가 코드 포함 |
+| `k9-help-request-alerts.patch` | K9 콘솔에 적용하는 변경 사항 전체 (`git am`으로 적용). 모듈 5개, 연결 코드, 테스트, 평가 코드 포함 |
 | `eval/RESULTS_20261111.md` | 전체 결과, 확인한 것과 확인하지 못한 것, 한계 |
 | `eval/keyword_eval_result.md` | 도움 요청 판정 기록별 결과 |
 | `eval/similarity_table.md` | 도움 요청 표현과의 자모 유사도 표 |
@@ -43,7 +43,7 @@
 팀 저장소의 K9 콘솔 폴더 상위에서:
 
 ```bash
-git am heesoo-help-request-alerts.patch
+git am k9-help-request-alerts.patch
 cd k9_patrol_console
 python -m pytest -q                          # 테스트
 python eval/selection_eval.py --mode llm     # 선정 시나리오 LLM 채점 (Ollama 실행 필요)

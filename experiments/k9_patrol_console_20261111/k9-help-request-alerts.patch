@@ -1,4 +1,4 @@
-From 329d261d37630ebe29b2b7acf493992cbce13ad8 Mon Sep 17 00:00:00 2001
+From c1fe4cb6a28874fb34c714e9b6a726de4eb94dd4 Mon Sep 17 00:00:00 2001
 From: hs <gmltn0011223344@gmail.com>
 Date: Thu, 12 Nov 2026 00:12:34 +0900
 Subject: [PATCH] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94:=20=EB=8F=84=EC=9B=80?=
@@ -484,13 +484,13 @@ index 0000000..72736b0
 +    main()
 diff --git a/k9_patrol_console/eval/RESULTS_20261111.md b/k9_patrol_console/eval/RESULTS_20261111.md
 new file mode 100644
-index 0000000..02547d4
+index 0000000..6c9ab2f
 --- /dev/null
 +++ b/k9_patrol_console/eval/RESULTS_20261111.md
 @@ -0,0 +1,82 @@
 +# 11/11 김희수 작업 결과 (도움 요청 판정 · 누운 자세 지속 · 알림 · 선정 병합 · 순찰 보고서)
 +
-+브랜치 `heesoo/help-request-alerts` (로컬). 새 파일: `help_request.py`, `lying_tracker.py`, `alerts.py`, `review_priority.py`, `patrol_report.py`, `tests/`, `eval/` 일부, `demo/`.
++새 파일: `help_request.py`, `lying_tracker.py`, `alerts.py`, `review_priority.py`, `patrol_report.py`, `tests/`, `eval/` 일부, `demo/`.
 +바뀐 파일: `speech.py`, `vision.py`, `highlights.py`, `app.py`, `storage.py`, `static/index.html`. 추가 설치 없음(표준 라이브러리만 사용).
 +
 +## 1. 도움 요청 판정 (`help_request.py` → `speech.py`)
