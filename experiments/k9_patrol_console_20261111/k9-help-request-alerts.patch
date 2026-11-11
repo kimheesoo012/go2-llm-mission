@@ -1,4 +1,4 @@
-From c1fe4cb6a28874fb34c714e9b6a726de4eb94dd4 Mon Sep 17 00:00:00 2001
+From 030014679038a780e087d01338a3e885f869279c Mon Sep 17 00:00:00 2001
 From: hs <gmltn0011223344@gmail.com>
 Date: Thu, 12 Nov 2026 00:12:34 +0900
 Subject: [PATCH] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94:=20=EB=8F=84=EC=9B=80?=
@@ -2695,12 +2695,12 @@ index e3b3a01..6fd876d 100644
          return out
 diff --git a/k9_patrol_console/tests/fake_console/highlights.py b/k9_patrol_console/tests/fake_console/highlights.py
 new file mode 100644
-index 0000000..916ead8
+index 0000000..fc11568
 --- /dev/null
 +++ b/k9_patrol_console/tests/fake_console/highlights.py
 @@ -0,0 +1,55 @@
 +"""Excerpt of the console's highlights.py selection path (compact / validate_selection / ask / _select),
-+copied from heesoo-standing-rule-llm-speed.patch (11/07) so that eval/selection_eval.py can be
++copied from the 11/07 selection-speed change so that eval/selection_eval.py can be
 +exercised without the console. The prompt text is replaced by a placeholder.
 +"""
 +import json
