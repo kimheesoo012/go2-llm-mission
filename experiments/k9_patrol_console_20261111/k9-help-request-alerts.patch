@@ -1,4 +1,4 @@
-From 66b4ad220b1b16b04e9d043e64be7215b9e63b93 Mon Sep 17 00:00:00 2001
+From 5ae504741f256fa316fb019430d8893d802a895e Mon Sep 17 00:00:00 2001
 From: hs <gmltn0011223344@gmail.com>
 Date: Thu, 12 Nov 2026 00:12:34 +0900
 Subject: [PATCH] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94:=20=EB=8F=84=EC=9B=80?=
@@ -31,13 +31,14 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  k9_patrol_console/conftest.py                 |   4 +
  k9_patrol_console/demo/alert_demo.html        | 128 +++
  k9_patrol_console/demo/replay_demo.py         |  67 ++
- k9_patrol_console/eval/RESULTS_20261111.md    | 123 +++
+ k9_patrol_console/eval/RESULTS_20261111.md    | 129 +++
  k9_patrol_console/eval/keyword_eval.py        |  54 ++
  k9_patrol_console/eval/keyword_eval_result.md |  53 ++
  k9_patrol_console/eval/replay_llm_run.py      |  48 ++
  .../run_20261112/replay_with_reason_check.md  |  32 +
  .../eval/run_20261112/selection_llm.md        |  40 +
  .../selection_merged_before_reason_check.md   |  43 +
+ .../eval/run_20261112/stt_prompt_ab.md        |  14 +
  k9_patrol_console/eval/selection_eval.py      | 107 +++
  .../eval/selection_result_rule.md             |  34 +
  .../eval/selection_scenarios.json             | 734 ++++++++++++++++++
@@ -66,7 +67,7 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  .../tests/test_review_priority.py             | 109 +++
  .../tests/test_selection_eval.py              |  45 ++
  k9_patrol_console/vision.py                   |  27 +-
- 40 files changed, 3482 insertions(+), 24 deletions(-)
+ 41 files changed, 3502 insertions(+), 24 deletions(-)
  create mode 100644 k9_patrol_console/alerts.py
  create mode 100644 k9_patrol_console/conftest.py
  create mode 100644 k9_patrol_console/demo/alert_demo.html
@@ -78,6 +79,7 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  create mode 100644 k9_patrol_console/eval/run_20261112/replay_with_reason_check.md
  create mode 100644 k9_patrol_console/eval/run_20261112/selection_llm.md
  create mode 100644 k9_patrol_console/eval/run_20261112/selection_merged_before_reason_check.md
+ create mode 100644 k9_patrol_console/eval/run_20261112/stt_prompt_ab.md
  create mode 100644 k9_patrol_console/eval/selection_eval.py
  create mode 100644 k9_patrol_console/eval/selection_result_rule.md
  create mode 100644 k9_patrol_console/eval/selection_scenarios.json
@@ -492,10 +494,10 @@ index 0000000..72736b0
 +    main()
 diff --git a/k9_patrol_console/eval/RESULTS_20261111.md b/k9_patrol_console/eval/RESULTS_20261111.md
 new file mode 100644
-index 0000000..c455fbe
+index 0000000..87c1fd8
 --- /dev/null
 +++ b/k9_patrol_console/eval/RESULTS_20261111.md
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,129 @@
 +# 11/11 김희수 작업 결과 (도움 요청 판정 · 누운 자세 지속 · 알림 · 선정 병합 · 순찰 보고서)
 +
 +새 파일: `help_request.py`, `lying_tracker.py`, `alerts.py`, `review_priority.py`, `patrol_report.py`, `tests/`, `eval/` 일부, `demo/`.
@@ -596,9 +598,15 @@ index 0000000..c455fbe
 +
 +그래서 **총평은 규칙 문장을 기본으로** 바꿨다. LLM 총평은 보고서 창의 `LLM 총평으로 다시 작성`을 눌렀을 때만 만들고, "집계 표와 대조해 확인 필요"라고 표시한다.
 +
-+### STT 초기 프롬프트 비교
++### STT 초기 프롬프트 비교 (`eval/run_20261112/stt_prompt_ab.md`)
 +
-+미실행 (실행한 Python에 faster-whisper 없음).
++| 파일 | 프롬프트 없음 | 프롬프트 있음 |
++|---|---|---|
++| 11/05 기록 (사랑해주세요) | 사랑해주세요 ×4 | 살려주세요. 도와주세요. 도와주세요. |
++| 11/05 기록 (눈 와주세요) | 살려주세요 ×2, 눈 와주세요 ×2 | 살려주세요. 도와주세요. |
++| 11/02 시험 녹음 | 살려주세요·도와주세요 5회 | 살려주세요·도와주세요 4회 |
++
++프롬프트를 주면 오인식이 사라지지만 발화 횟수가 줄어든다 (프롬프트 표현 쪽으로 끌려감). 세 파일 모두 실제 도움 요청 녹음이라, 일상 대화·소음 녹음에서 없는 도움 요청을 만들어내는지는 확인하지 못했다. 그 확인 전에는 콘솔에 적용하지 않는다. 세 녹음 모두 최대 음량이 가능한 범위의 8% 정도로 작다.
 +
 +## 확인한 것 / 확인하지 못한 것
 +
@@ -610,7 +618,7 @@ index 0000000..c455fbe
 +| 실제 로봇 연결 상태에서 녹음 → 알림 | 미확인 |
 +| Go2 영상에서 누운 자세 지속 | 미확인 (누운 장면 없음) |
 +| 실제 LLM으로 시나리오 채점, LLM 총평 | 11/12 2회 실행 (6번 항목) |
-+| STT 초기 프롬프트 비교 (`eval/stt_prompt_ab.py`) | 미실행 |
++| STT 초기 프롬프트 비교 (`eval/stt_prompt_ab.py`) | 도움 요청 녹음 3개로만 실행. 일상 대화·소음 녹음은 미확인 |
 +
 +## 한계
 +
@@ -925,6 +933,26 @@ index 0000000..5320c02
 +- 10. r6 (rule+llm): '사람 살려'라는 명확한 구호와 서 있는 자세가 위험 상황을 시사함.
 +- 10. r8 (rule+llm): 구급차 호출 요청과 함께 사람이 등장하여 추가 확인이 필요한 기록임.
 +- 10. r2 (rule): 누워 있음 자세 후보
+diff --git a/k9_patrol_console/eval/run_20261112/stt_prompt_ab.md b/k9_patrol_console/eval/run_20261112/stt_prompt_ab.md
+new file mode 100644
+index 0000000..bd06d9b
+--- /dev/null
++++ b/k9_patrol_console/eval/run_20261112/stt_prompt_ab.md
+@@ -0,0 +1,14 @@
++# STT 초기 프롬프트 비교 (11/12, 맥북 M4, faster-whisper 1.2.1, small, cpu int8)
++
++프롬프트: `살려주세요. 도와주세요. 구해주세요.` · 나머지 설정은 speech.py와 동일 (beam 5, VAD 사용)
++
++| 파일 | 프롬프트 없음 | 판정 | 프롬프트 있음 | 판정 |
++|---|---|---|---|---|
++| 11/05 기록 0e654017 | 사랑해주세요 사랑해주세요 사랑해주세요 사랑해주세요 | 도움 요청 의심 | 살려주세요. 도와주세요. 도와주세요. | 도움 요청 |
++| 11/05 기록 81e320cb | 살려주세요 살려주세요 눈 와주세요 눈 와주세요 | 도움 요청 | 살려주세요. 도와주세요. | 도움 요청 |
++| 11/02 test.wav | 살려주세요 도와주세요 살려주세요 도와주세요 살려주세요 | 도움 요청 | 살려주세요. 도와주세요. 살려주세요. 도와주세요. | 도움 요청 |
++
++- 프롬프트 없이 돌린 결과는 저장된 원문과 같다 (재현됨).
++- 프롬프트를 주면 "사랑해주세요", "눈 와주세요"가 사라지고 도움 요청 표현으로 인식된다.
++- 그러나 발화 횟수가 줄었다 (4→3, 4→2, 5→4). 프롬프트에 있는 표현 쪽으로 결과가 끌려간다는 뜻이다.
++- **세 파일 모두 실제로 도움 요청을 말한 녹음이다.** 일상 대화나 소음만 있는 녹음에서 프롬프트가 없는 도움 요청을 만들어내는지는 확인하지 못했다. 이 확인 전에는 콘솔에 적용하지 않는다.
 diff --git a/k9_patrol_console/eval/selection_eval.py b/k9_patrol_console/eval/selection_eval.py
 new file mode 100644
 index 0000000..1426b8a
