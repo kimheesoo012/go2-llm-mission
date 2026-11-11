@@ -1,4 +1,4 @@
-From 2de462a1a6e3a0425247e66060a3a02c06ba87f3 Mon Sep 17 00:00:00 2001
+From c1de6083b929ed193375bb5956a9279b9a27d1f8 Mon Sep 17 00:00:00 2001
 From: hs <gmltn0011223344@gmail.com>
 Date: Thu, 12 Nov 2026 00:12:34 +0900
 Subject: [PATCH] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94:=20=EB=8F=84=EC=9B=80?=
@@ -48,7 +48,7 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  k9_patrol_console/help_request.py             | 171 ++++
  k9_patrol_console/highlights.py               |  46 +-
  k9_patrol_console/lying_tracker.py            | 116 +++
- k9_patrol_console/patrol_report.py            | 221 ++++++
+ k9_patrol_console/patrol_report.py            | 223 ++++++
  k9_patrol_console/review_priority.py          | 113 +++
  .../__pycache__/__init__.cpython-312.pyc      | Bin 188 -> 0 bytes
  .../__pycache__/connection.cpython-312.pyc    | Bin 2050 -> 0 bytes
@@ -62,11 +62,11 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  k9_patrol_console/tests/test_end_to_end.py    |  33 +
  k9_patrol_console/tests/test_help_request.py  | 108 +++
  k9_patrol_console/tests/test_lying_tracker.py | 138 ++++
- k9_patrol_console/tests/test_patrol_report.py | 117 +++
+ k9_patrol_console/tests/test_patrol_report.py | 126 +++
  .../tests/test_review_priority.py             | 109 +++
  .../tests/test_selection_eval.py              |  45 ++
  k9_patrol_console/vision.py                   |  27 +-
- 40 files changed, 3444 insertions(+), 24 deletions(-)
+ 40 files changed, 3455 insertions(+), 24 deletions(-)
  create mode 100644 k9_patrol_console/alerts.py
  create mode 100644 k9_patrol_console/conftest.py
  create mode 100644 k9_patrol_console/demo/alert_demo.html
@@ -2388,10 +2388,10 @@ index 0000000..1ad4abc
 +        self.tracks.clear()
 diff --git a/k9_patrol_console/patrol_report.py b/k9_patrol_console/patrol_report.py
 new file mode 100644
-index 0000000..f2ef7d0
+index 0000000..2748938
 --- /dev/null
 +++ b/k9_patrol_console/patrol_report.py
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,223 @@
 +"""One-page patrol report from stored records.
 +
 +Every number and every listed event is computed by rules from the records.
@@ -2508,7 +2508,9 @@ index 0000000..f2ef7d0
 +        raise ValueError('단정 표현 포함: ' + ', '.join(bad))
 +    allowed = set(re.findall(r'\d+', json.dumps(facts, ensure_ascii=False)))
 +    allowed |= {str(int(n)) for n in allowed}  # 09 -> 9
-+    extra = [n for n in re.findall(r'\d+', text) if n not in allowed and str(int(n)) not in allowed]
++    # "4,297 분" is one number: drop thousands separators before comparing.
++    plain = re.sub(r'(?<=\d),(?=\d{3}(?!\d))', '', text)
++    extra = [n for n in re.findall(r'\d+', plain) if n not in allowed and str(int(n)) not in allowed]
 +    if extra:
 +        raise ValueError('집계에 없는 숫자: ' + ', '.join(extra))
 +    return text.strip()
@@ -3699,10 +3701,10 @@ index 0000000..d8cca75
 +    assert ev[0][0] == 15.0 and '15초' in ev[0][1]['message']
 diff --git a/k9_patrol_console/tests/test_patrol_report.py b/k9_patrol_console/tests/test_patrol_report.py
 new file mode 100644
-index 0000000..871f6b4
+index 0000000..2aea2e6
 --- /dev/null
 +++ b/k9_patrol_console/tests/test_patrol_report.py
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,126 @@
 +import json
 +import pytest
 +from patrol_report import build_facts, rule_overview, check_overview, make_report
@@ -3820,6 +3822,15 @@ index 0000000..871f6b4
 +    r = make_report(RECORDS, 'qwen3.5:4b', fake_chat(text))
 +    assert r['llm_rejected_text'] == text and text not in r['markdown'] and r['overview_source'] == 'rule'
 +    assert make_report(RECORDS)['llm_rejected_text'] == ''
++
++
++def test_thousands_separator_is_not_a_new_number():
++    f = build_facts(RECORDS + [obs(9, '2026-11-02T10:51:21+00:00')])
++    assert f['minutes'] == 4281
++    assert check_overview('약 3일간 총 4,281 분 동안 기록 7건이 저장되었습니다.', f)
++    import pytest as _p
++    with _p.raises(ValueError):
++        check_overview('총 4,282 분 동안 기록 7건이 저장되었습니다.', f)
 diff --git a/k9_patrol_console/tests/test_review_priority.py b/k9_patrol_console/tests/test_review_priority.py
 new file mode 100644
 index 0000000..1c3d43f
