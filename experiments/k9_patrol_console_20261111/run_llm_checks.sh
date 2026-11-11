@@ -34,7 +34,8 @@ for label, pick in (('전체 기록', lambda r: True), ('11/05 기록', lambda r
     info = svc.status()
     r = info['result'] or {}
     text += [f"## {label}", f"- 걸린 시간: {time.monotonic() - t:.1f}초", f"- 총평 작성: {r.get('overview_source')}",
-             f"- LLM 오류/거부 사유: {r.get('llm_error') or info['error'] or '없음'}", '', r.get('markdown', ''), '']
+             f"- LLM 오류/거부 사유: {r.get('llm_error') or info['error'] or '없음'}",
+             f"- 거부된 LLM 원문: {r.get('llm_rejected_text') or '없음'}", '', r.get('markdown', ''), '']
 open(out + '/report_llm.md', 'w', encoding='utf-8').write('\n'.join(text))
 PYEOF
 echo "[4/4] STT 초기 프롬프트 비교 (faster-whisper 필요)"
