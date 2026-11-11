@@ -1,4 +1,4 @@
-From c1de6083b929ed193375bb5956a9279b9a27d1f8 Mon Sep 17 00:00:00 2001
+From 66b4ad220b1b16b04e9d043e64be7215b9e63b93 Mon Sep 17 00:00:00 2001
 From: hs <gmltn0011223344@gmail.com>
 Date: Thu, 12 Nov 2026 00:12:34 +0900
 Subject: [PATCH] =?UTF-8?q?K9=20=EC=BD=98=EC=86=94:=20=EB=8F=84=EC=9B=80?=
@@ -31,7 +31,7 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  k9_patrol_console/conftest.py                 |   4 +
  k9_patrol_console/demo/alert_demo.html        | 128 +++
  k9_patrol_console/demo/replay_demo.py         |  67 ++
- k9_patrol_console/eval/RESULTS_20261111.md    | 115 +++
+ k9_patrol_console/eval/RESULTS_20261111.md    | 123 +++
  k9_patrol_console/eval/keyword_eval.py        |  54 ++
  k9_patrol_console/eval/keyword_eval_result.md |  53 ++
  k9_patrol_console/eval/replay_llm_run.py      |  48 ++
@@ -43,17 +43,17 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  .../eval/selection_scenarios.json             | 734 ++++++++++++++++++
  k9_patrol_console/eval/similarity_table.md    |  33 +
  k9_patrol_console/eval/similarity_table.py    |  39 +
- k9_patrol_console/eval/stt_prompt_ab.py       |  47 ++
+ k9_patrol_console/eval/stt_prompt_ab.py       |  62 ++
  k9_patrol_console/eval/transcripts.csv        |  42 +
  k9_patrol_console/help_request.py             | 171 ++++
  k9_patrol_console/highlights.py               |  46 +-
  k9_patrol_console/lying_tracker.py            | 116 +++
- k9_patrol_console/patrol_report.py            | 223 ++++++
+ k9_patrol_console/patrol_report.py            | 226 ++++++
  k9_patrol_console/review_priority.py          | 113 +++
  .../__pycache__/__init__.cpython-312.pyc      | Bin 188 -> 0 bytes
  .../__pycache__/connection.cpython-312.pyc    | Bin 2050 -> 0 bytes
  k9_patrol_console/speech.py                   |   6 +
- k9_patrol_console/static/index.html           |  63 +-
+ k9_patrol_console/static/index.html           |  64 +-
  k9_patrol_console/storage.py                  |   2 +-
  .../tests/fake_console/highlights.py          |  55 ++
  .../tests/fake_console/ollama_connection.py   |  17 +
@@ -66,7 +66,7 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  .../tests/test_review_priority.py             | 109 +++
  .../tests/test_selection_eval.py              |  45 ++
  k9_patrol_console/vision.py                   |  27 +-
- 40 files changed, 3455 insertions(+), 24 deletions(-)
+ 40 files changed, 3482 insertions(+), 24 deletions(-)
  create mode 100644 k9_patrol_console/alerts.py
  create mode 100644 k9_patrol_console/conftest.py
  create mode 100644 k9_patrol_console/demo/alert_demo.html
@@ -223,7 +223,7 @@ index 0000000..b1d00a5
 +        with self.lock:
 +            return [dict(a) for a in reversed(self.alerts)]
 diff --git a/k9_patrol_console/app.py b/k9_patrol_console/app.py
-index 05251c5..e024b5f 100644
+index 05251c5..93bc30b 100644
 --- a/k9_patrol_console/app.py
 +++ b/k9_patrol_console/app.py
 @@ -16,6 +16,9 @@ from ollama_connection import start_background
@@ -269,7 +269,7 @@ index 05251c5..e024b5f 100644
 +                    if not alerts.ack(str(data.get('id',''))):raise ValueError('알림을 찾을 수 없습니다.')
 +                elif self.path=='/api/report':
 +                    records=store.list('','',str(data.get('session','')),False)
-+                    reports.start(records,data.get('model','qwen3.5:4b'),data.get('llm',True) is True,'현재 순찰' if data.get('session') else '전체 기록')
++                    reports.start(records,data.get('model','qwen3.5:4b'),data.get('llm',False) is True,'현재 순찰' if data.get('session') else '전체 기록')
                  elif self.path=='/api/highlights':
                      records=store.list(str(data.get('q','')),str(data.get('target','')),str(data.get('session','')),False)
                      records=[r for r in records if r['state'] in ('ready','partial')]
@@ -492,10 +492,10 @@ index 0000000..72736b0
 +    main()
 diff --git a/k9_patrol_console/eval/RESULTS_20261111.md b/k9_patrol_console/eval/RESULTS_20261111.md
 new file mode 100644
-index 0000000..860f00b
+index 0000000..c455fbe
 --- /dev/null
 +++ b/k9_patrol_console/eval/RESULTS_20261111.md
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,123 @@
 +# 11/11 김희수 작업 결과 (도움 요청 판정 · 누운 자세 지속 · 알림 · 선정 병합 · 순찰 보고서)
 +
 +새 파일: `help_request.py`, `lying_tracker.py`, `alerts.py`, `review_priority.py`, `patrol_report.py`, `tests/`, `eval/` 일부, `demo/`.
@@ -569,6 +569,8 @@ index 0000000..860f00b
 +| 규칙 우선 + LLM | 8/10 | 7건 |
 +| 규칙 우선 + LLM + 이유 문장 검증 | 9/10 | 1건 |
 +
++이유 문장 검증을 넣은 뒤 실제 LLM으로 다시 실행해도 9/10이었다. 단, LLM 출력이 1차 실행과 같아서(같은 입력·설정) 새로운 표현에 대한 확인은 아니다.
++
 +- LLM만 쓸 때 놓친 것: 음성 없이 누운 자세만 있는 기록(아무것도 선정하지 않음), 누운 자세 기록 1건, 누움+도움 요청 기록의 1순위. 규칙을 앞에 두면 모두 해결.
 +- LLM이 불필요하게 고른 7건 중 6건은 이유에 "제외", "중요한 단서가 없음"이라고 적은 기록이었다. 선정하지 않을 기록을 선정 목록에 넣은 것.
 +- 이유 문장에 "의식 상실", "낙상" 같은 추정이 프롬프트 금지에도 여러 번 나왔고, 앉아 있음 후보 기록을 "누워 있음 자세 후보"라고 쓴 경우가 있었다.
@@ -586,7 +588,13 @@ index 0000000..860f00b
 +| 전체 기록 25건 | 규칙 문장으로 대체 (24.1초) | 집계에 없는 숫자 297 |
 +| 11/05 기록 8건 | 규칙 문장으로 대체 (22.3초) | 낙상·의식·부상 단어 포함 |
 +
-+검증은 의도대로 동작했지만 두 번 모두 거부되어, 현재 프롬프트로는 LLM 총평이 쓰이지 않는다. 거부된 원문을 남기지 않아 원인을 보지 못했고, 이후 `llm_rejected_text`로 남기도록 고쳤다 (재실행 필요).
++거부된 원문을 남기도록 고친 뒤 다시 실행해 확인한 내용:
++
++- 297은 검증의 실수였다. 원문은 "총 4,297 분"이었고 쉼표 때문에 4와 297로 읽었다. 수정함.
++- 두 번째는 "낙상·부상 등 의식 상태에 대한 추정치는 없습니다"라는 부정문이었다. 단어만 보고 거부한 것.
++- 그러나 검증을 통과했더라도 틀린 문장이 있었다. "25건의 기록 중 23명의 인물이 관여했습니다"는 사람이 탐지된 기록 23건을 23명으로 바꿔 쓴 것이고, 숫자는 맞아서 자동으로 걸러낼 수 없다.
++
++그래서 **총평은 규칙 문장을 기본으로** 바꿨다. LLM 총평은 보고서 창의 `LLM 총평으로 다시 작성`을 눌렀을 때만 만들고, "집계 표와 대조해 확인 필요"라고 표시한다.
 +
 +### STT 초기 프롬프트 비교
 +
@@ -596,12 +604,12 @@ index 0000000..860f00b
 +
 +| 항목 | 상태 |
 +|---|---|
-+| 테스트 132개 (`python -m pytest -q`) | 통과 |
++| 테스트 133개 (`python -m pytest -q`) | 통과 |
 +| 실제 저장 기록 25건으로 음성 판정·선정·보고서 | 확인 (로봇·Ollama 없이) |
 +| 서버 실행 후 API·화면 표시 (알림, 선정 카드, 기록 태그, 보고서 창) | 확인 (알림 화면은 알림 데이터를 넣어서 확인) |
 +| 실제 로봇 연결 상태에서 녹음 → 알림 | 미확인 |
 +| Go2 영상에서 누운 자세 지속 | 미확인 (누운 장면 없음) |
-+| 실제 LLM으로 시나리오 채점, LLM 총평 | 11/12 1회 실행 (6번 항목). 이유 문장 검증을 넣은 뒤의 재실행은 아직 |
++| 실제 LLM으로 시나리오 채점, LLM 총평 | 11/12 2회 실행 (6번 항목) |
 +| STT 초기 프롬프트 비교 (`eval/stt_prompt_ab.py`) | 미실행 |
 +
 +## 한계
@@ -1897,10 +1905,10 @@ index 0000000..7118515
 +    main()
 diff --git a/k9_patrol_console/eval/stt_prompt_ab.py b/k9_patrol_console/eval/stt_prompt_ab.py
 new file mode 100644
-index 0000000..2cf79d6
+index 0000000..cb019eb
 --- /dev/null
 +++ b/k9_patrol_console/eval/stt_prompt_ab.py
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,62 @@
 +"""A/B: does an initial prompt with the help phrases change what the STT writes?
 +
 +NOT RUN YET. Uses the same faster-whisper call as speech.py (cpu, int8, beam 5, VAD on),
@@ -1924,8 +1932,23 @@ index 0000000..2cf79d6
 +PROMPT = '살려주세요. 도와주세요. 구해주세요.'
 +
 +
++def load(path):
++    """16 kHz mono 16-bit WAV (what speech.py stores) -> float32 samples.
++    Read here so the result does not depend on the installed PyAV version;
++    any other format is handed to faster-whisper as a path."""
++    import wave
++    import numpy as np
++    try:
++        with wave.open(str(path), 'rb') as w:
++            if (w.getframerate(), w.getnchannels(), w.getsampwidth(), w.getcomptype()) != (16000, 1, 2, 'NONE'):
++                return str(path)
++            return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
++    except (wave.Error, EOFError):
++        return str(path)
++
++
 +def transcribe(model, path, language, prompt):
-+    segments, _ = model.transcribe(str(path), language=language, task='transcribe', beam_size=5, vad_filter=True,
++    segments, _ = model.transcribe(load(path), language=language, task='transcribe', beam_size=5, vad_filter=True,
 +                                   condition_on_previous_text=False, initial_prompt=prompt or None)
 +    return ' '.join(s.text.strip() for s in segments if s.text.strip())
 +
@@ -2388,10 +2411,10 @@ index 0000000..1ad4abc
 +        self.tracks.clear()
 diff --git a/k9_patrol_console/patrol_report.py b/k9_patrol_console/patrol_report.py
 new file mode 100644
-index 0000000..2748938
+index 0000000..b37e3d3
 --- /dev/null
 +++ b/k9_patrol_console/patrol_report.py
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,226 @@
 +"""One-page patrol report from stored records.
 +
 +Every number and every listed event is computed by rules from the records.
@@ -2555,7 +2578,7 @@ index 0000000..2748938
 +        lines += [f"| {e['time']} | {' + '.join(e['kinds'])} | {e['detail']} | {e['record_id'][:8]} |" for e in f['events']]
 +    else:
 +        lines.append('없음')
-+    lines += ['', '---', f"총평 작성: {'로컬 LLM (집계 결과만 입력, 숫자·단정 표현 검증 통과)' if source == 'llm' else '규칙 문장'}"
++    lines += ['', '---', f"총평 작성: {'로컬 LLM (집계 결과만 입력, 숫자·단정 표현 검증 통과) · 문장 내용은 집계 표와 대조해 확인 필요' if source == 'llm' else '규칙 문장'}"
 +              ' · 발화는 STT 결과이며 발화자는 확인되지 않음 · 자세는 규칙 기반 후보']
 +    return '\n'.join(lines) + '\n'
 +
@@ -2575,7 +2598,10 @@ index 0000000..2748938
 +
 +
 +class ReportService:
-+    """Background report generation for the console (same pattern as HighlightsService)."""
++    """Background report generation for the console (same pattern as HighlightsService).
++
++    The overview is the rule sentence unless use_llm is set: in the 11/12 run the model turned
++    "23 records with a person" into "23 people", which no automatic check here can catch."""
 +
 +    def __init__(self, store):
 +        import threading
@@ -2586,7 +2612,7 @@ index 0000000..2748938
 +        with self.lock:
 +            return dict(self.info)
 +
-+    def start(self, records, model, use_llm=True, scope='전체 기록'):
++    def start(self, records, model, use_llm=False, scope='전체 기록'):
 +        import threading
 +        if not isinstance(model, str) or not 1 <= len(model.strip()) <= 150:
 +            raise ValueError('모델 이름을 확인하세요.')
@@ -2599,7 +2625,7 @@ index 0000000..2748938
 +            self.info.update(busy=True, error='', result=None)
 +        threading.Thread(target=self.generate, args=(records, model.strip(), use_llm, scope), daemon=True).start()
 +
-+    def generate(self, records, model, use_llm=True, scope='전체 기록'):
++    def generate(self, records, model, use_llm=False, scope='전체 기록'):
 +        try:
 +            from highlights import observation_data
 +            observations = [dict(observation_data(r), record_id=r['id'],
@@ -2818,7 +2844,7 @@ index bb96a87..f18dec0 100644
          except Exception as exc:
              meta['error']=f'{type(exc).__name__}: {exc} · 저장된 원본 WAV는 유지됩니다.'
 diff --git a/k9_patrol_console/static/index.html b/k9_patrol_console/static/index.html
-index 6c791e6..e15f827 100644
+index 6c791e6..a7754f3 100644
 --- a/k9_patrol_console/static/index.html
 +++ b/k9_patrol_console/static/index.html
 @@ -305,6 +305,22 @@ dialog::backdrop{background:rgba(10,15,25,.36);backdrop-filter:blur(2px)}
@@ -2875,7 +2901,7 @@ index 6c791e6..e15f827 100644
  </dialog>
  
 +<dialog aria-labelledby="patrolTitle" id="patrolDialog">
-+ <div class="dhead"><h2 id="patrolTitle">순찰 보고서</h2><button id="patrolDownload">내려받기</button><button id="closePatrol">닫기</button></div>
++ <div class="dhead"><h2 id="patrolTitle">순찰 보고서</h2><button id="patrolLlm" title="집계 결과를 LLM이 문장으로 옮깁니다. 내용은 집계 표와 대조해 확인하세요.">LLM 총평으로 다시 작성</button><button id="patrolDownload">내려받기</button><button id="closePatrol">닫기</button></div>
 + <div style="padding:16px 18px"><pre id="patrolBody"></pre></div>
 +</dialog>
  <dialog aria-labelledby="audioTitle" id="audioDialog">
@@ -2926,7 +2952,7 @@ index 6c791e6..e15f827 100644
   const items=people.map((d,i)=>({n:i+1,code:d.posture?.code||'none',label:d.posture?.label||'자세 모델 미사용',reason:d.posture?.reason||'',conf:Math.round((d.confidence||0)*100)}));
   const key=(v.video?'v':'x')+JSON.stringify(items.map(x=>[x.code,x.label,Math.round(x.conf/5)]));if(e.dataset.key===key)return;e.dataset.key=key;
   if(!v.video){e.replaceChildren(text('p','영상이 연결되면 탐지된 사람의 자세가 표시됩니다.','subject-empty'));return}
-@@ -614,6 +640,33 @@ function refreshPosture(v){
+@@ -614,6 +640,34 @@ function refreshPosture(v){
    const bar=document.createElement('div');bar.className='subject-bar';const fill=document.createElement('i');fill.style.setProperty('--w',it.conf+'%');bar.append(fill);
    row.append(top,bar);if(it.reason)row.append(text('p',it.reason,'subject-reason'));return row}));
  }
@@ -2948,12 +2974,13 @@ index 6c791e6..e15f827 100644
 +}
 +/* 순찰 보고서: 집계는 서버 규칙 계산, 총평만 LLM (실패하면 규칙 문장) */
 +let patrolPending=false,patrolResult=null;
-+$('patrolReport').onclick=async()=>{stop();try{await api('report',{session:$('highlightScope').value==='current'?(state?.vision.session||''):'',model:$('model').value.trim(),llm:true});patrolPending=true;await refresh()}catch(e){toast(e.message)}};
++async function requestReport(llm){stop();try{await api('report',{session:$('highlightScope').value==='current'?(state?.vision.session||''):'',model:$('model').value.trim(),llm});patrolPending=true;if(llm)toast('LLM 총평 작성 중');await refresh()}catch(e){toast(e.message)}}
++$('patrolReport').onclick=()=>requestReport(false);$('patrolLlm').onclick=()=>requestReport(true);
 +function refreshReport(r){
-+ if(!r)return;$('patrolReport').disabled=r.busy;$('patrolReport').textContent=r.busy?'작성 중…':'순찰 보고서';
++ if(!r)return;$('patrolReport').disabled=$('patrolLlm').disabled=r.busy;$('patrolReport').textContent=r.busy?'작성 중…':'순찰 보고서';
 + if(!patrolPending||r.busy)return;patrolPending=false;
 + if(r.error){toast(r.error);return}
-+ if(r.result){patrolResult=r.result;$('patrolBody').textContent=r.result.markdown;$('patrolDialog').showModal()}
++ if(r.result){patrolResult=r.result;$('patrolBody').textContent=r.result.markdown;if(!$('patrolDialog').open)$('patrolDialog').showModal();if(r.result.llm_error)toast('LLM 총평을 쓰지 못해 규칙 문장을 표시합니다. ('+r.result.llm_error+')')}
 +}
 +$('closePatrol').onclick=()=>$('patrolDialog').close();
 +$('patrolDownload').onclick=()=>{if(patrolResult)download(new Blob([patrolResult.markdown],{type:'text/markdown;charset=utf-8'}),'k9-patrol-report-'+patrolResult.facts.date+'.md')};
