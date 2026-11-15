@@ -1,4 +1,4 @@
-From 17b424b7f7706ae202bcbc465974bc706f7ffb0a Mon Sep 17 00:00:00 2001
+From 6ec6e0832ad1a09aee8fd850ad7c0fa74f694d57 Mon Sep 17 00:00:00 2001
 From: hs <hs@users.noreply.github.com>
 Date: Sun, 15 Nov 2026 17:06:51 +0900
 Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.5?=
@@ -33,17 +33,13 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
  k9_patrol_console/eval/posture_sim.py         |  72 +++++
  k9_patrol_console/posture_rules.py            | 285 +++++++++++++-----
  k9_patrol_console/rotate_detect.py            |  52 ++++
- .../test_posture_rules.cpython-313.pyc        | Bin 0 -> 4636 bytes
- .../test_rotate_detect.cpython-313.pyc        | Bin 0 -> 1861 bytes
  k9_patrol_console/tests/test_posture_rules.py |  39 +++
  k9_patrol_console/tests/test_rotate_detect.py |  17 ++
  k9_patrol_console/vision.py                   |   9 +
- 9 files changed, 431 insertions(+), 68 deletions(-)
+ 7 files changed, 431 insertions(+), 68 deletions(-)
  create mode 100644 k9_patrol_console/eval/posture_eval_20261114.py
  create mode 100644 k9_patrol_console/eval/posture_sim.py
  create mode 100644 k9_patrol_console/rotate_detect.py
- create mode 100644 k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc
- create mode 100644 k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc
  create mode 100644 k9_patrol_console/tests/test_posture_rules.py
  create mode 100644 k9_patrol_console/tests/test_rotate_detect.py
 
@@ -525,94 +521,6 @@ index 0000000..538b5a2
 +        keypoints = [[*map_back(x, y, turn, width, height), c] for x, y, c in r.keypoints.data[i].tolist()]
 +        found.append(dict(target='person', confidence=float(b.conf[0]), xyxy=box, keypoints=keypoints, rotated=turn))
 +    return found
-diff --git a/k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc b/k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc
-new file mode 100644
-index 0000000000000000000000000000000000000000..33516e0a88c9078a605b5d65cbc66c6527c4ba63
-GIT binary patch
-literal 4636
-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
-OrHXf|GU7@e@BaYMImq?^
-
-literal 0
-HcmV?d00001
-
-diff --git a/k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc b/k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc
-new file mode 100644
-index 0000000000000000000000000000000000000000..c38b17dd83d2b168d025647650ccb6db7fff9f7f
-GIT binary patch
-literal 1861
-zcmbVM&rcgi6n?Y2wzps#FkmPUaNW~NDOOvY5~xxEii8>k6>m{daWz`(1-95;GqbLX
-zdTA~VxizXPMTiP1C+NxQiCc5XA5hD*psA`x%E`AVq=(+Bx9g1owW^fwF#BfSn>X*r
-z_x3Cj=>P!W<-b3FECD>ljSsaYoT&uhd(c5Aw}5$H!iWyKbW8eBW^w|uknye0A=7zo
-z(}E7!U=p%&60)H*@eVURzP62YOU%UDXFhZ}0092&wB(&9yvRCO=O83OSB5|jWJzYw
-zztu)s_GA{xM)ly-GJp{S$db%x+r~%oWh4n$C+kEDHBq&o5uto!I2%pOA?I5oT1mlK
-z0<dgZz)~?uCrs9*Az+Fw4*?743Jb0Ww4eyxHp;U`ZnGIgPyTHLwgy8zd*XW1NksxE
-z$8@O|=JNpVZej^C=kK(z(kco-M)A+uNWzk&%Wri6EGh0P>&kL0ja3DJ<%tQYUDQ|e
-zzdY0O@4li3{>%IAHGobmEoi|7O|l-z0M>{EpedTfFbQ|jq-Gufn(qLBCRsnD)i7E~
-z))N9?MF{}IM1_>A3OSdnYO?4wI5(MdbE{$$gv9bfEgEIIYUDPxfKa$uSQF$ELFNVd
-zQjl$q*(VTUKDA*N%~Y;nRPtu3YO~E0->_{bRdrIE*J;^sm|dVbyTt8+nQ~0-aCfE5
-zb_~a)dDAg-&UkrSbfJ<myHd(ihgoGY&}#PhB}E8_&;)?5;WXTPPu?L<d*8b^w=;7Z
-z?mh{R)Waitnf;aBm4lvxw-0*{77zOmwrYJfqj6>GXyzz=9R3%>#lv?Gwhq&^{@PaK
-z%Jk9V(aqn&v(E$2H+hC_zCbm6-=$j3rP`}CJq0>hBq`9PMdA}kmwhRLUh$nv_&=(?
-z^h(ZoRoY(HK?^KsN}DWAoEtWTR8g9JC=VldaJbos&nTBIn!+M@5Jl!F)Uqq0$0N;5
-zp=fiDIvQc!*d3g*1nWmr)$JadcVFnIWmnK2pY$53hELSNx;nTQ+aK5+csTsyXN}jV
-zk7kb58?I`!u8!`p{pxP@;a5LRH^x4AM1ECg8UC;iVL=NCmC}+?G$|DwlosuLrGRpn
-zQe<>X(?#i;#kf<jN@mHXl*KWjF^saGQtlXzm7|8^Fl)8qn4D7f1{&ZaZY~V}I_`o3
-z$4Yzy&!s?Mj{Fst0&~POMJ2{lG^`S(TDOq-HWzB8WI0$15h@$bM!{NTNFt%&P6VwI
-z&YzIE!|?8!<;EXkCbtV;n0SYoC5Ma1g}L#%p?+*~XU^cJ7huwLi?3gbU#RbUmASzt
-zT0dXD1^~}wLdc)c`v(l3f_zuKqu%Yh)AcR6|K|PtgURnoC-JNG_|-;y{3L#@9=}%G
-zs>iQ4VpGR3{W}c3P+lW*WM|_fI#!R4y#U-ji-Qv0`LrPqJW%%|yOAHdevt><;`{^m
-C40@RW
-
-literal 0
-HcmV?d00001
-
 diff --git a/k9_patrol_console/tests/test_posture_rules.py b/k9_patrol_console/tests/test_posture_rules.py
 new file mode 100644
 index 0000000..a7b9411
