@@ -32,7 +32,7 @@ def _tilt(a, b):
 
 def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
     result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
-                  method='coco17_rules_v3.1', keypoint_threshold=min_conf)
+                  method='coco17_rules_v3.3', keypoint_threshold=min_conf)
 
     def finish(code, reason, **metrics):
         result['metrics'].update(metrics)
@@ -90,7 +90,9 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
                 return finish('lying', '몸통이 카메라 방향으로 놓여 어깨 너비보다 짧게 보이고 다리도 낮게 있음')
             return finish('unknown', '상체를 카메라 쪽으로 숙였거나 다리가 안 보여 누움으로 보기 어려움')
         # 누움 ②: 옆에서 본 경우. 몸통이 가로이고, 몸 전체가 가로로 길거나 다리가 골반 높이 근처에 있음
-        if tilt >= 60 and legs and ((aspect >= 1.25 and w / h >= 1.1) or drop <= .6 * scale):
+        #         웅크려 엎드린 경우는 관절이 모여 가로로 길지 않으므로, 사람 박스가 가로로 넓은지를 함께 본다.
+        if tilt >= 60 and legs and ((aspect >= 1.25 and w / h >= 1.1) or drop <= .6 * scale
+                                    or (w / h >= 1.4 and drop <= 1.1 * scale)):
             return finish('lying', '몸통이 가로로 놓였고 몸 전체가 낮고 길게 보임')
         # 누움 ③: 머리가 카메라 쪽. 어깨가 골반보다 아래에 찍히고 다리도 골반 아래로 내려가지 않음
         if dy <= -.25 * torso:
@@ -155,7 +157,10 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
             vote = '?'
             if ok_size and share >= STAND_SHARE and shin <= 35 and leg_v > .6 * math.dist(hi, an):
                 vote = 'stand'
-            elif ok_size and share <= SIT_SHARE and an[1] > hi[1]:
+            # 상체 없이 앉음은 옆모습(허벅지가 가로로, 정강이와 비슷한 길이로 보임)만 인정한다.
+            # 상체가 잘리면 골반 위치가 허벅지 중간쯤으로 잘못 잡히는 일이 있어, 정면 앉음과 구분할 수 없다.
+            elif (ok_size and share <= SIT_SHARE and an[1] > hi[1] and _tilt(hi, kn) >= 45
+                  and math.dist(hi, kn) >= .6 * math.dist(kn, an)):
                 vote = 'seat'
             votes.append(vote)
             info.append(dict(side=leg['side'], thigh_share=round(share, 2), shin_tilt=round(shin, 1), vote=vote))
@@ -176,8 +181,8 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
                              shin_over_box=round((an[1] - kn[1]) / h, 2),
                              above_knee_over_shin=round((kn[1] - box[1]) / max(an[1] - kn[1], 1), 2)))
         result['metrics'].update(basis='shin_only', legs=info)
-        # 정강이가 세로로 길고, 무릎 위로도 박스가 정강이 길이의 절반 이상 이어져야 한다.
-        good = [r for r in info if r['shin_tilt'] <= 30 and r['shin_over_box'] >= .3 and r['above_knee_over_shin'] >= .5]
+        # 정강이가 세로로 길고, 무릎 위로도 박스가 이어져야 한다(정강이 길이의 0.3배 이상).
+        good = [r for r in info if r['shin_tilt'] <= 30 and r['shin_over_box'] >= .3 and r['above_knee_over_shin'] >= .3]
         if shin_only and good and len(good) == len(info):
             return finish('standing', '가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)')
         return finish('unknown', '다리만 보이나 서 있음 조건 불충족')
