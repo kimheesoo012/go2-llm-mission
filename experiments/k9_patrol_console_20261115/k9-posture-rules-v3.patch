@@ -1,7 +1,7 @@
-From 93277013e0bf87bc8cbe4f806eb8a23bb745d93e Mon Sep 17 00:00:00 2001
+From c5b5e816b50c6dc44c7450bd21e0b0d840d58da9 Mon Sep 17 00:00:00 2001
 From: hs <hs@users.noreply.github.com>
 Date: Sun, 15 Nov 2026 17:06:51 +0900
-Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.3:?=
+Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.4:?=
  =?UTF-8?q?=20=EA=B4=80=EC=A0=88=20=EA=B0=81=EB=8F=84=20=EB=8C=80=EC=8B=A0?=
  =?UTF-8?q?=20=EC=84=B8=EB=A1=9C=20=EC=9C=84=EC=B9=98=20=EB=B9=84=EC=9C=A8?=
  =?UTF-8?q?=EB=A1=9C=20=ED=8C=90=EB=8B=A8?=
@@ -14,8 +14,8 @@ Content-Transfer-Encoding: 8bit
 - 서 있음/앉음: 골반-무릎-발목의 세로 위치 비율로 판단 (정면·바닥 앉음 포함)
 - 누움: 옆모습(웅크림 포함), 카메라 방향(몸통이 어깨 너비보다 짧게 찍힘), 머리가 카메라 쪽
 - 보이는 쪽 관절만으로 계산, 다리만 보이는 근접 서 있음(shin_only 옵션)
-- 판단 불가 이유를 '너무 가깝거나 일부만 보임'과 '조건 불충족'으로 구분
-검증: 11/14 클립 프레임 294건 판단 불가 176→110(106건은 너무 가까움),
+- 사람이 너무 가까워 관절을 못 찾은 경우는 code는 unknown 그대로, label만 '너무 가까움'으로 표시
+검증: 11/14 클립 프레임 294건 기준 판단 불가 176 → 4, 너무 가까움 106,
 96프레임 세트 서 있음 16→19/23, 앉음 69→73/73, 잘못된 자세 1건(멀리 화면 끝).
 eval/posture_eval_20261114.py, eval/posture_sim.py, tests/test_posture_rules.py 추가.
 
@@ -24,9 +24,9 @@ Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
 ---
  .../eval/posture_eval_20261114.py             |  25 ++
  k9_patrol_console/eval/posture_sim.py         |  70 +++++
- k9_patrol_console/posture_rules.py            | 248 +++++++++++++-----
+ k9_patrol_console/posture_rules.py            | 256 +++++++++++++-----
  k9_patrol_console/tests/test_posture_rules.py |  38 +++
- 4 files changed, 313 insertions(+), 68 deletions(-)
+ 4 files changed, 321 insertions(+), 68 deletions(-)
  create mode 100644 k9_patrol_console/eval/posture_eval_20261114.py
  create mode 100644 k9_patrol_console/eval/posture_sim.py
  create mode 100644 k9_patrol_console/tests/test_posture_rules.py
@@ -139,10 +139,10 @@ index 0000000..0478f4d
 +        for k,v in sorted(bad.items(),key=lambda kv:-len(kv[1])):print(len(v),k,v[:6])
 +if __name__=='__main__':run('posture_rules','-v' in sys.argv)
 diff --git a/k9_patrol_console/posture_rules.py b/k9_patrol_console/posture_rules.py
-index 85eeb33..d73307f 100644
+index 85eeb33..9d46c3e 100644
 --- a/k9_patrol_console/posture_rules.py
 +++ b/k9_patrol_console/posture_rules.py
-@@ -1,82 +1,194 @@
+@@ -1,82 +1,202 @@
 -"""Conservative, frame-local rules for COCO-17 image-space keypoints.
 -Labels describe posture candidates, never falls, consciousness, or health.
 -No identity tracking; detection indices are local to each frame.
@@ -166,6 +166,7 @@ index 85eeb33..d73307f 100644
 +STAND_SHARE = .40   # 골반→발목 세로 길이 중 허벅지(골반→무릎)가 차지하는 비율
 +SIT_SHARE = .35
 +FLOOR_RATIO = .45
++TOO_CLOSE_LABEL = '너무 가까움'
 +FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
 +
 +
@@ -193,7 +194,7 @@ index 85eeb33..d73307f 100644
 -        result.update(code=code,label=LABELS[code],reason=reason)
 +def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
 +    result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
-+                  method='coco17_rules_v3.3', keypoint_threshold=min_conf)
++                  method='coco17_rules_v3.4', keypoint_threshold=min_conf)
 +
 +    def finish(code, reason, **metrics):
 +        result['metrics'].update(metrics)
@@ -400,14 +401,21 @@ index 85eeb33..d73307f 100644
 +            return finish('standing', '가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)')
 +        return finish('unknown', '다리만 보이나 서 있음 조건 불충족')
 +
-+    result['metrics']['basis'] = 'none'
-+    return finish('unknown', '너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음')
++    # 자세를 못 본 것이 아니라 사람이 너무 가까운 경우다. 코드는 unknown 그대로 두고 표시 문구만 나눈다.
++    result['metrics'].update(basis='none', too_close=True, touches_top=box[1] <= 3)
++    reason = '너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음'
++    if box[1] <= 3:
++        # 카메라가 바닥에서 약 30 cm 높이라, 화면 위쪽 끝까지 닿은 몸은 그보다 높이 올라와 있다.
++        reason += ' · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움'
++    finish('unknown', reason)
++    result['label'] = TOO_CLOSE_LABEL
++    return result
  
  
  def draw_postures(image, detections):
 diff --git a/k9_patrol_console/tests/test_posture_rules.py b/k9_patrol_console/tests/test_posture_rules.py
 new file mode 100644
-index 0000000..e7deb8c
+index 0000000..ac65211
 --- /dev/null
 +++ b/k9_patrol_console/tests/test_posture_rules.py
 @@ -0,0 +1,38 @@
@@ -440,7 +448,7 @@ index 0000000..e7deb8c
 +        self.assertEqual(r['code'],'unknown')
 +    def test_too_close(self):
 +        r=classify_posture([[10,10,.1] for _ in range(17)],[0,0,430,538])
-+        self.assertEqual(r['code'],'unknown');self.assertIn('너무 가깝거나',r['reason'])
++        self.assertEqual(r['code'],'unknown');self.assertIn('너무 가깝거나',r['reason']);self.assertEqual(r['label'],'너무 가까움')
 +    def test_shin_only_can_be_turned_off(self):
 +        k=kp({13:(662,208),14:(862,214),15:(628,495),16:(812,521)})
 +        self.assertEqual(classify_posture(k,[526,0,957,540])['code'],'standing')

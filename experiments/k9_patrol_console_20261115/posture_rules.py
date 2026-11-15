@@ -15,6 +15,7 @@ KEYPOINT_MIN = .45
 STAND_SHARE = .40   # 골반→발목 세로 길이 중 허벅지(골반→무릎)가 차지하는 비율
 SIT_SHARE = .35
 FLOOR_RATIO = .45
+TOO_CLOSE_LABEL = '너무 가까움'
 FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
 
 
@@ -32,7 +33,7 @@ def _tilt(a, b):
 
 def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
     result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
-                  method='coco17_rules_v3.3', keypoint_threshold=min_conf)
+                  method='coco17_rules_v3.4', keypoint_threshold=min_conf)
 
     def finish(code, reason, **metrics):
         result['metrics'].update(metrics)
@@ -187,8 +188,15 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
             return finish('standing', '가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)')
         return finish('unknown', '다리만 보이나 서 있음 조건 불충족')
 
-    result['metrics']['basis'] = 'none'
-    return finish('unknown', '너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음')
+    # 자세를 못 본 것이 아니라 사람이 너무 가까운 경우다. 코드는 unknown 그대로 두고 표시 문구만 나눈다.
+    result['metrics'].update(basis='none', too_close=True, touches_top=box[1] <= 3)
+    reason = '너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음'
+    if box[1] <= 3:
+        # 카메라가 바닥에서 약 30 cm 높이라, 화면 위쪽 끝까지 닿은 몸은 그보다 높이 올라와 있다.
+        reason += ' · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움'
+    finish('unknown', reason)
+    result['label'] = TOO_CLOSE_LABEL
+    return result
 
 
 def draw_postures(image, detections):
