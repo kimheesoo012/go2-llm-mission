@@ -1,7 +1,7 @@
-From 1d05fb0d542a8c7e039dcf0ef1dafa3b8524e2f3 Mon Sep 17 00:00:00 2001
+From 93277013e0bf87bc8cbe4f806eb8a23bb745d93e Mon Sep 17 00:00:00 2001
 From: hs <hs@users.noreply.github.com>
 Date: Sun, 15 Nov 2026 17:06:51 +0900
-Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.1:?=
+Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.3:?=
  =?UTF-8?q?=20=EA=B4=80=EC=A0=88=20=EA=B0=81=EB=8F=84=20=EB=8C=80=EC=8B=A0?=
  =?UTF-8?q?=20=EC=84=B8=EB=A1=9C=20=EC=9C=84=EC=B9=98=20=EB=B9=84=EC=9C=A8?=
  =?UTF-8?q?=EB=A1=9C=20=ED=8C=90=EB=8B=A8?=
@@ -9,14 +9,15 @@ MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-11/14 촬영 기록에서 판단 불가가 많았던 원인(양쪽 골반 필수, 옆모습 ㄴ자만 앉음으로 인정,
+11/14 촬영에서 판단 불가가 많았던 원인(양쪽 골반 필수, 옆모습 ㄴ자만 앉음으로 인정,
 어깨가 골반 아래면 바로 판단 불가)을 고친다.
 - 서 있음/앉음: 골반-무릎-발목의 세로 위치 비율로 판단 (정면·바닥 앉음 포함)
-- 누움: 옆모습, 카메라 방향(몸통이 어깨 너비보다 짧게 찍힘), 머리가 카메라 쪽
+- 누움: 옆모습(웅크림 포함), 카메라 방향(몸통이 어깨 너비보다 짧게 찍힘), 머리가 카메라 쪽
 - 보이는 쪽 관절만으로 계산, 다리만 보이는 근접 서 있음(shin_only 옵션)
 - 판단 불가 이유를 '너무 가깝거나 일부만 보임'과 '조건 불충족'으로 구분
-검증: eval/posture_eval_20261114.py (11/14 기록 57건), eval/posture_sim.py (기하 계산), tests/test_posture_rules.py
-한계: 11/07 96프레임 세트(eval/posture_eval.py)는 포즈 모델이 필요해 아직 다시 돌리지 않음.
+검증: 11/14 클립 프레임 294건 판단 불가 176→110(106건은 너무 가까움),
+96프레임 세트 서 있음 16→19/23, 앉음 69→73/73, 잘못된 자세 1건(멀리 화면 끝).
+eval/posture_eval_20261114.py, eval/posture_sim.py, tests/test_posture_rules.py 추가.
 
 Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
