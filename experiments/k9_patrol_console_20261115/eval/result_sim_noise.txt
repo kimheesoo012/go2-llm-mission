@@ -1,0 +1,9 @@
+0.02 0 standing {'sitting': 0.1, 'standing': 99.0, 'unknown': 0.9}
+0.02 0 sitting {'sitting': 99.5, 'unknown': 0.5}
+0.02 0 lying {'lying': 99.9, 'unknown': 0.1}
+0.04 0 standing {'lying': 0.1, 'sitting': 2.4, 'standing': 92.5, 'unknown': 5.0}
+0.04 0 sitting {'lying': 0.0, 'sitting': 96.4, 'standing': 0.7, 'unknown': 2.9}
+0.04 0 lying {'lying': 99.2, 'sitting': 0.2, 'unknown': 0.6}
+0.04 0.2 standing {'lying': 0.1, 'sitting': 2.8, 'standing': 69.8, 'unknown': 27.2}
+0.04 0.2 sitting {'sitting': 82.7, 'standing': 1.5, 'unknown': 15.8}
+0.04 0.2 lying {'lying': 82.7, 'sitting': 4.2, 'standing': 0.5, 'unknown': 12.7}
