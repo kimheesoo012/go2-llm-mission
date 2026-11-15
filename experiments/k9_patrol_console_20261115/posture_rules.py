@@ -16,6 +16,8 @@ STAND_SHARE = .40   # 골반→발목 세로 길이 중 허벅지(골반→무�
 SIT_SHARE = .35
 FLOOR_RATIO = .45
 TOO_CLOSE_LABEL = '너무 가까움'
+TORSO_PER_SHOULDER = 1.4   # 몸통 길이 / 어깨 너비 (성인 평균에 가까운 값)
+LYING_ELEVATION = 45       # 몸통이 바닥에서 일어선 각도가 이 이하면 누움 쪽으로 본다
 FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
 
 
@@ -31,9 +33,26 @@ def _tilt(a, b):
     return math.degrees(math.atan2(abs(b[0] - a[0]), abs(b[1] - a[1])))
 
 
+def torso_elevation(dx, dy, shoulder_w, ratio=TORSO_PER_SHOULDER):
+    """몸통이 바닥에서 일어선 각도(도)를 2D 좌표에서 추정한다. 90 = 똑바로 세움, 0 = 바닥과 평행.
+    사람이 카메라를 비스듬히 향하면 몸통의 가로 성분이 줄어 실제보다 서 있는 것처럼 보인다.
+    그만큼 어깨 너비는 넓게 찍히므로, 몸통 길이 = 어깨 너비 x ratio 라는 신체 비율로 방향을 소거한다.
+        dy = L sin(e),  dx = L cos(e) |sin(yaw)|,  어깨너비 = (L/ratio) |cos(yaw)|
+    를 풀면 u = sin^2(e) 는  k u^2 - (dy^2 + dx^2 + k) u + dy^2 = 0  (k = ratio^2 x 어깨너비^2) 의 작은 근이다.
+    어깨가 한쪽만 보이면(shoulder_w = 0) 일반적인 2D 기울기와 같다.
+    """
+    dy2, dx2, k = dy * dy, dx * dx, (ratio * shoulder_w) ** 2
+    if k < 1e-6:
+        u = dy2 / (dy2 + dx2) if dy2 + dx2 > 0 else 1.
+    else:
+        a = dy2 + dx2 + k
+        u = (a - math.sqrt(max(a * a - 4 * k * dy2, 0.))) / (2 * k)
+    return math.degrees(math.asin(math.sqrt(min(max(u, 0.), 1.))))
+
+
 def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
     result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
-                  method='coco17_rules_v3.4', keypoint_threshold=min_conf)
+                  method='coco17_rules_v3.5', keypoint_threshold=min_conf)
 
     def finish(code, reason, **metrics):
         result['metrics'].update(metrics)
@@ -95,6 +114,12 @@ def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
         if tilt >= 60 and legs and ((aspect >= 1.25 and w / h >= 1.1) or drop <= .6 * scale
                                     or (w / h >= 1.4 and drop <= 1.1 * scale)):
             return finish('lying', '몸통이 가로로 놓였고 몸 전체가 낮고 길게 보임')
+        # 누움 ④: 반쯤 누운 자세. 몸통이 바닥에서 일어선 각도를 추정해 45도 이하이고 다리도 낮으면 누움으로 본다.
+        #         (몸의 중심선과 바닥의 각도 45도 기준: Chen 외, Symmetry 2020)
+        rise = torso_elevation(dx, dy, shoulder_w)
+        result['metrics']['torso_elevation_degrees'] = round(rise, 1)
+        if dy > 0 and rise <= LYING_ELEVATION and low and drop <= 1.1 * scale:
+            return finish('lying', '몸통이 바닥에서 절반 이하로만 일어서 있고 다리도 낮게 있음 (비스듬히 누운 형태)')
         # 누움 ③: 머리가 카메라 쪽. 어깨가 골반보다 아래에 찍히고 다리도 골반 아래로 내려가지 않음
         if dy <= -.25 * torso:
             if low and drop <= .35 * torso:
@@ -209,6 +234,10 @@ def draw_postures(image, detections):
     font_path=next((f for f in fonts if f and Path(f).is_file()),None)
     labels=[(i,d) for i,d in enumerate(detections,1) if 'posture' in d]
     if not labels:return image
+    for i,d in labels:
+        if d.get('rotated'):   # 돌린 영상에서만 잡힌 사람은 모델이 상자를 그리지 않으므로 여기서 그린다
+            import cv2
+            x0,y0,x1,y1=[int(v) for v in d['xyxy']];cv2.rectangle(image,(x0,y0),(x1,y1),(123,152,250),2)
     colors={'standing':(117,215,159),'sitting':(246,203,103),'lying':(250,152,123),'unknown':(190,199,206)}
     if font_path:
         from PIL import Image,ImageDraw,ImageFont

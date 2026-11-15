@@ -1,9 +1,9 @@
 0.02 0 standing {'sitting': 0.1, 'standing': 99.0, 'unknown': 0.9}
-0.02 0 sitting {'sitting': 99.5, 'unknown': 0.5}
-0.02 0 lying {'lying': 99.9, 'unknown': 0.1}
+0.02 0 sitting {'lying': 0.0, 'sitting': 99.5, 'unknown': 0.5}
+0.02 0 lying {'lying': 99.6, 'sitting': 0.3, 'standing': 0.1, 'unknown': 0.1}
 0.04 0 standing {'lying': 0.1, 'sitting': 2.3, 'standing': 92.5, 'unknown': 5.1}
-0.04 0 sitting {'lying': 0.0, 'sitting': 96.4, 'standing': 0.7, 'unknown': 2.9}
-0.04 0 lying {'lying': 99.3, 'sitting': 0.2, 'unknown': 0.5}
-0.04 0.2 standing {'lying': 0.1, 'sitting': 2.0, 'standing': 69.8, 'unknown': 28.0}
-0.04 0.2 sitting {'sitting': 81.7, 'standing': 1.5, 'unknown': 16.8}
-0.04 0.2 lying {'lying': 83.0, 'sitting': 3.5, 'standing': 0.7, 'unknown': 12.8}
+0.04 0 sitting {'lying': 1.0, 'sitting': 95.5, 'standing': 0.7, 'unknown': 2.8}
+0.04 0 lying {'lying': 99.1, 'sitting': 0.3, 'standing': 0.2, 'unknown': 0.4}
+0.04 0.2 standing {'lying': 0.2, 'sitting': 2.0, 'standing': 69.8, 'unknown': 28.0}
+0.04 0.2 sitting {'lying': 0.7, 'sitting': 81.1, 'standing': 1.5, 'unknown': 16.6}
+0.04 0.2 lying {'lying': 82.8, 'sitting': 4.1, 'standing': 0.7, 'unknown': 12.4}

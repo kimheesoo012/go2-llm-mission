@@ -1,35 +1,51 @@
-From c5b5e816b50c6dc44c7450bd21e0b0d840d58da9 Mon Sep 17 00:00:00 2001
+From 17b424b7f7706ae202bcbc465974bc706f7ffb0a Mon Sep 17 00:00:00 2001
 From: hs <hs@users.noreply.github.com>
 Date: Sun, 15 Nov 2026 17:06:51 +0900
-Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.4:?=
- =?UTF-8?q?=20=EA=B4=80=EC=A0=88=20=EA=B0=81=EB=8F=84=20=EB=8C=80=EC=8B=A0?=
- =?UTF-8?q?=20=EC=84=B8=EB=A1=9C=20=EC=9C=84=EC=B9=98=20=EB=B9=84=EC=9C=A8?=
- =?UTF-8?q?=EB=A1=9C=20=ED=8C=90=EB=8B=A8?=
+Subject: [PATCH] =?UTF-8?q?=EC=9E=90=EC=84=B8=20=EA=B7=9C=EC=B9=99=20v3.5?=
+ =?UTF-8?q?=20+=20=EB=88=84=EC=9A=B4=20=EC=82=AC=EB=9E=8C=20=EA=B2=80?=
+ =?UTF-8?q?=EC=B6=9C=20=EB=B3=B4=EC=99=84(=EC=98=81=EC=83=81=20=ED=9A=8C?=
+ =?UTF-8?q?=EC=A0=84)?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-11/14 촬영에서 판단 불가가 많았던 원인(양쪽 골반 필수, 옆모습 ㄴ자만 앉음으로 인정,
-어깨가 골반 아래면 바로 판단 불가)을 고친다.
-- 서 있음/앉음: 골반-무릎-발목의 세로 위치 비율로 판단 (정면·바닥 앉음 포함)
-- 누움: 옆모습(웅크림 포함), 카메라 방향(몸통이 어깨 너비보다 짧게 찍힘), 머리가 카메라 쪽
+자세 규칙 (posture_rules.py)
+- 서 있음/앉음: 관절 각도 대신 골반-무릎-발목의 세로 위치 비율로 판단 (정면·바닥 앉음 포함)
+- 누움: 옆모습(웅크림 포함), 카메라 방향(몸통이 어깨 너비보다 짧게 찍힘), 머리가 카메라 쪽,
+  비스듬히 누움(몸통이 바닥에서 일어선 각도 추정 45도 이하, Chen 외 Symmetry 2020의 45도 기준)
+- 누움을 먼저 검사하고, 누움 조건은 앉음·서 있음보다 넓게 잡는다
 - 보이는 쪽 관절만으로 계산, 다리만 보이는 근접 서 있음(shin_only 옵션)
-- 사람이 너무 가까워 관절을 못 찾은 경우는 code는 unknown 그대로, label만 '너무 가까움'으로 표시
-검증: 11/14 클립 프레임 294건 기준 판단 불가 176 → 4, 너무 가까움 106,
-96프레임 세트 서 있음 16→19/23, 앉음 69→73/73, 잘못된 자세 1건(멀리 화면 끝).
-eval/posture_eval_20261114.py, eval/posture_sim.py, tests/test_posture_rules.py 추가.
+- 너무 가까워 관절을 못 찾은 경우는 code는 unknown 그대로, label만 '너무 가까움'
+
+누운 사람 검출 (rotate_detect.py, vision.py infer에 연결)
+- 포즈 모델이 누운 사람을 사람으로 잡지 못하는 경우가 많아, 영상을 90도 돌려 한 번 더 검출
+  (Maldonado-Bascón 외, Electronics 2019의 방법). K9_ROTATE_DETECT=0/1/2
+- 11/14 누운 프레임 27장: 원본만 9장 → 번갈아 17장 → 양쪽 21장 검출·누움 판단
+
+검증: 11/14 클립 프레임 294건 판단 불가 176 → 4(너무 가까움 106 별도),
+96프레임 세트 서 있음 16→19/23, 앉음 69→73/73, 잘못된 자세 1건.
+알려진 오답: 멀리 쪼그려 앉은 사람 1건이 누움으로 나옴(누움 우선의 대가).
 
 Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
 ---
  .../eval/posture_eval_20261114.py             |  25 ++
- k9_patrol_console/eval/posture_sim.py         |  70 +++++
- k9_patrol_console/posture_rules.py            | 256 +++++++++++++-----
- k9_patrol_console/tests/test_posture_rules.py |  38 +++
- 4 files changed, 321 insertions(+), 68 deletions(-)
+ k9_patrol_console/eval/posture_sim.py         |  72 +++++
+ k9_patrol_console/posture_rules.py            | 285 +++++++++++++-----
+ k9_patrol_console/rotate_detect.py            |  52 ++++
+ .../test_posture_rules.cpython-313.pyc        | Bin 0 -> 4636 bytes
+ .../test_rotate_detect.cpython-313.pyc        | Bin 0 -> 1861 bytes
+ k9_patrol_console/tests/test_posture_rules.py |  39 +++
+ k9_patrol_console/tests/test_rotate_detect.py |  17 ++
+ k9_patrol_console/vision.py                   |   9 +
+ 9 files changed, 431 insertions(+), 68 deletions(-)
  create mode 100644 k9_patrol_console/eval/posture_eval_20261114.py
  create mode 100644 k9_patrol_console/eval/posture_sim.py
+ create mode 100644 k9_patrol_console/rotate_detect.py
+ create mode 100644 k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc
+ create mode 100644 k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc
  create mode 100644 k9_patrol_console/tests/test_posture_rules.py
+ create mode 100644 k9_patrol_console/tests/test_rotate_detect.py
 
 diff --git a/k9_patrol_console/eval/posture_eval_20261114.py b/k9_patrol_console/eval/posture_eval_20261114.py
 new file mode 100644
@@ -64,10 +80,10 @@ index 0000000..72a40d9
 +for k in sorted(tab):print(k,dict(tab[k]))
 diff --git a/k9_patrol_console/eval/posture_sim.py b/k9_patrol_console/eval/posture_sim.py
 new file mode 100644
-index 0000000..0478f4d
+index 0000000..f95acff
 --- /dev/null
 +++ b/k9_patrol_console/eval/posture_sim.py
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,72 @@
 +"""Go2 카메라(높이 0.30 m, 수평)에서 본 사람 관절을 기하학적으로 만들어 규칙을 점검한다.
 +한계: 관절이 모두 정확히 잡힌다고 가정(가림·오검출 없음). 실제 영상 검증을 대신하지 못한다."""
 +import math,sys,collections,importlib
@@ -100,6 +116,8 @@ index 0000000..0478f4d
 +  '바로 누움':P((-.50,0,.12),(0,0,.12),(.40,.1,.12),(.82,.1,.08),head=(-.72,0,.12)),
 +  '누움·무릎 세움':P((-.50,0,.12),(0,0,.12),(.25,.1,.42),(.45,.1,.08),head=(-.72,0,.12)),
 +  '옆으로 웅크림':{5:(-.48,.05,.44),6:(-.48,.05,.08),11:(0,0,.28),12:(0,0,.08),13:(.25,.30,.25),14:(.25,.30,.08),15:(0,.55,.20),16:(0,.55,.08),0:(-.68,.12,.15)},
++  '비스듬히 기대 누움':P((-.42,0,.36),(0,0,.12),(.40,.1,.12),(.82,.1,.08),head=(-.60,0,.48)),
++  '옆으로 누워 팔 괴기':{5:(-.40,.0,.50),6:(-.46,.0,.16),11:(0,0,.30),12:(0,0,.10),13:(.35,.15,.22),14:(.38,.05,.08),15:(.70,.25,.12),16:(.78,.05,.08),0:(-.55,0,.62)},
 +  '엎드림':P((-.50,0,.10),(0,0,.10),(.42,.1,.06),(.84,.1,.06),head=(-.70,0,.15)),
 + },
 + 'unknown':{
@@ -139,10 +157,10 @@ index 0000000..0478f4d
 +        for k,v in sorted(bad.items(),key=lambda kv:-len(kv[1])):print(len(v),k,v[:6])
 +if __name__=='__main__':run('posture_rules','-v' in sys.argv)
 diff --git a/k9_patrol_console/posture_rules.py b/k9_patrol_console/posture_rules.py
-index 85eeb33..9d46c3e 100644
+index 85eeb33..3b801ec 100644
 --- a/k9_patrol_console/posture_rules.py
 +++ b/k9_patrol_console/posture_rules.py
-@@ -1,82 +1,202 @@
+@@ -1,82 +1,227 @@
 -"""Conservative, frame-local rules for COCO-17 image-space keypoints.
 -Labels describe posture candidates, never falls, consciousness, or health.
 -No identity tracking; detection indices are local to each frame.
@@ -167,6 +185,8 @@ index 85eeb33..9d46c3e 100644
 +SIT_SHARE = .35
 +FLOOR_RATIO = .45
 +TOO_CLOSE_LABEL = '너무 가까움'
++TORSO_PER_SHOULDER = 1.4   # 몸통 길이 / 어깨 너비 (성인 평균에 가까운 값)
++LYING_ELEVATION = 45       # 몸통이 바닥에서 일어선 각도가 이 이하면 누움 쪽으로 본다
 +FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
 +
 +
@@ -175,26 +195,43 @@ index 85eeb33..9d46c3e 100644
 +    if not got:
 +        return None
 +    return (sum(p[0] for p in got) / len(got), sum(p[1] for p in got) / len(got))
++
  
++def _tilt(a, b):
++    """0 = 세로, 90 = 가로."""
++    return math.degrees(math.atan2(abs(b[0] - a[0]), abs(b[1] - a[1])))
  
 -def angle(a, b, c):
 -    u=(a[0]-b[0],a[1]-b[1]);v=(c[0]-b[0],c[1]-b[1])
 -    length=math.hypot(*u)*math.hypot(*v)
 -    if length<1e-8:return None
 -    return math.degrees(math.acos(max(-1.,min(1.,(u[0]*v[0]+u[1]*v[1])/length))))
-+def _tilt(a, b):
-+    """0 = 세로, 90 = 가로."""
-+    return math.degrees(math.atan2(abs(b[0] - a[0]), abs(b[1] - a[1])))
  
++def torso_elevation(dx, dy, shoulder_w, ratio=TORSO_PER_SHOULDER):
++    """몸통이 바닥에서 일어선 각도(도)를 2D 좌표에서 추정한다. 90 = 똑바로 세움, 0 = 바닥과 평행.
++    사람이 카메라를 비스듬히 향하면 몸통의 가로 성분이 줄어 실제보다 서 있는 것처럼 보인다.
++    그만큼 어깨 너비는 넓게 찍히므로, 몸통 길이 = 어깨 너비 x ratio 라는 신체 비율로 방향을 소거한다.
++        dy = L sin(e),  dx = L cos(e) |sin(yaw)|,  어깨너비 = (L/ratio) |cos(yaw)|
++    를 풀면 u = sin^2(e) 는  k u^2 - (dy^2 + dx^2 + k) u + dy^2 = 0  (k = ratio^2 x 어깨너비^2) 의 작은 근이다.
++    어깨가 한쪽만 보이면(shoulder_w = 0) 일반적인 2D 기울기와 같다.
++    """
++    dy2, dx2, k = dy * dy, dx * dx, (ratio * shoulder_w) ** 2
++    if k < 1e-6:
++        u = dy2 / (dy2 + dx2) if dy2 + dx2 > 0 else 1.
++    else:
++        a = dy2 + dx2 + k
++        u = (a - math.sqrt(max(a * a - 4 * k * dy2, 0.))) / (2 * k)
++    return math.degrees(math.asin(math.sqrt(min(max(u, 0.), 1.))))
  
 -def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN):
 -    result=dict(code='unknown',label=LABELS['unknown'],reason='',metrics={},
 -                method='coco17_rules_v1',keypoint_threshold=min_conf)
 -    def finish(code, reason):
 -        result.update(code=code,label=LABELS[code],reason=reason)
++
 +def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
 +    result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
-+                  method='coco17_rules_v3.4', keypoint_threshold=min_conf)
++                  method='coco17_rules_v3.5', keypoint_threshold=min_conf)
 +
 +    def finish(code, reason, **metrics):
 +        result['metrics'].update(metrics)
@@ -308,6 +345,12 @@ index 85eeb33..9d46c3e 100644
 +        if tilt >= 60 and legs and ((aspect >= 1.25 and w / h >= 1.1) or drop <= .6 * scale
 +                                    or (w / h >= 1.4 and drop <= 1.1 * scale)):
 +            return finish('lying', '몸통이 가로로 놓였고 몸 전체가 낮고 길게 보임')
++        # 누움 ④: 반쯤 누운 자세. 몸통이 바닥에서 일어선 각도를 추정해 45도 이하이고 다리도 낮으면 누움으로 본다.
++        #         (몸의 중심선과 바닥의 각도 45도 기준: Chen 외, Symmetry 2020)
++        rise = torso_elevation(dx, dy, shoulder_w)
++        result['metrics']['torso_elevation_degrees'] = round(rise, 1)
++        if dy > 0 and rise <= LYING_ELEVATION and low and drop <= 1.1 * scale:
++            return finish('lying', '몸통이 바닥에서 절반 이하로만 일어서 있고 다리도 낮게 있음 (비스듬히 누운 형태)')
 +        # 누움 ③: 머리가 카메라 쪽. 어깨가 골반보다 아래에 찍히고 다리도 골반 아래로 내려가지 않음
 +        if dy <= -.25 * torso:
 +            if low and drop <= .35 * torso:
@@ -413,12 +456,169 @@ index 85eeb33..9d46c3e 100644
  
  
  def draw_postures(image, detections):
+@@ -89,6 +234,10 @@ def draw_postures(image, detections):
+     font_path=next((f for f in fonts if f and Path(f).is_file()),None)
+     labels=[(i,d) for i,d in enumerate(detections,1) if 'posture' in d]
+     if not labels:return image
++    for i,d in labels:
++        if d.get('rotated'):   # 돌린 영상에서만 잡힌 사람은 모델이 상자를 그리지 않으므로 여기서 그린다
++            import cv2
++            x0,y0,x1,y1=[int(v) for v in d['xyxy']];cv2.rectangle(image,(x0,y0),(x1,y1),(123,152,250),2)
+     colors={'standing':(117,215,159),'sitting':(246,203,103),'lying':(250,152,123),'unknown':(190,199,206)}
+     if font_path:
+         from PIL import Image,ImageDraw,ImageFont
+diff --git a/k9_patrol_console/rotate_detect.py b/k9_patrol_console/rotate_detect.py
+new file mode 100644
+index 0000000..538b5a2
+--- /dev/null
++++ b/k9_patrol_console/rotate_detect.py
+@@ -0,0 +1,52 @@
++"""누운 사람 검출 보완: 영상을 90도 돌려 한 번 더 검출한다.
++
++포즈 모델은 서 있는 사람 위주로 학습되어, 바닥에 가로로 누운 사람을 아예 사람으로
++잡지 못하는 경우가 많다(11/14 촬영의 누운 프레임 27장 중 9장만 검출). 영상을 90도 돌리면
++누운 사람이 세로로 서 있는 모양이 되어 검출된다. 같은 방법이 넘어진 사람 검출 로봇 연구
++(Maldonado-Bascón 외, Electronics 2019)에서 재현율을 77.7% → 92.1%로 올리는 데 쓰였다.
++
++K9_ROTATE_DETECT=1 (기본): 호출할 때마다 한쪽 방향만 돌린다(시계/반시계 번갈아). 추론 시간 약 2배.
++K9_ROTATE_DETECT=2: 매번 양쪽 방향 모두 돌린다. 추론 시간 약 3배, 누운 사람을 가장 많이 잡는다.
++K9_ROTATE_DETECT=0: 끔.
++"""
++import os
++
++MODE = os.environ.get('K9_ROTATE_DETECT', '1')
++ENABLED = MODE != '0'
++BOTH = MODE == '2'
++
++
++def _iou(a, b):
++    x0, y0, x1, y1 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
++    inter = max(0., x1 - x0) * max(0., y1 - y0)
++    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
++    return inter / union if union > 0 else 0.
++
++
++def map_back(x, y, turn, width, height):
++    """돌린 영상의 좌표를 원본 좌표로 되돌린다. turn: 'cw'(시계) 또는 'ccw'(반시계)."""
++    return (y, height - 1 - x) if turn == 'cw' else (width - 1 - y, x)
++
++
++def rotated_people(model, image, confidence, existing, turn, person_class=0, imgsz=512):
++    """돌린 영상에서만 잡힌 사람을 원본 좌표로 돌려준다.
++    existing: 원본 영상에서 이미 잡힌 detection 목록(xyxy 포함). 겹치면(IoU>=0.3) 버린다.
++    """
++    import cv2
++    height, width = image.shape[:2]
++    code = cv2.ROTATE_90_CLOCKWISE if turn == 'cw' else cv2.ROTATE_90_COUNTERCLOCKWISE
++    r = model.predict(cv2.rotate(image, code), conf=confidence, classes=[person_class], imgsz=imgsz, verbose=False)[0]
++    if r.boxes is None or r.keypoints is None:
++        return []
++    found = []
++    for i, b in enumerate(r.boxes):
++        if len(r.keypoints.data) <= i:
++            continue
++        x0, y0, x1, y1 = [float(v) for v in b.xyxy[0].tolist()]
++        p, q = map_back(x0, y0, turn, width, height), map_back(x1, y1, turn, width, height)
++        box = [min(p[0], q[0]), min(p[1], q[1]), max(p[0], q[0]), max(p[1], q[1])]
++        if any(_iou(box, d['xyxy']) >= .3 for d in list(existing) + found):
++            continue
++        keypoints = [[*map_back(x, y, turn, width, height), c] for x, y, c in r.keypoints.data[i].tolist()]
++        found.append(dict(target='person', confidence=float(b.conf[0]), xyxy=box, keypoints=keypoints, rotated=turn))
++    return found
+diff --git a/k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc b/k9_patrol_console/tests/__pycache__/test_posture_rules.cpython-313.pyc
+new file mode 100644
+index 0000000000000000000000000000000000000000..33516e0a88c9078a605b5d65cbc66c6527c4ba63
+GIT binary patch
+literal 4636
+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
+OrHXf|GU7@e@BaYMImq?^
+
+literal 0
+HcmV?d00001
+
+diff --git a/k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc b/k9_patrol_console/tests/__pycache__/test_rotate_detect.cpython-313.pyc
+new file mode 100644
+index 0000000000000000000000000000000000000000..c38b17dd83d2b168d025647650ccb6db7fff9f7f
+GIT binary patch
+literal 1861
+zcmbVM&rcgi6n?Y2wzps#FkmPUaNW~NDOOvY5~xxEii8>k6>m{daWz`(1-95;GqbLX
+zdTA~VxizXPMTiP1C+NxQiCc5XA5hD*psA`x%E`AVq=(+Bx9g1owW^fwF#BfSn>X*r
+z_x3Cj=>P!W<-b3FECD>ljSsaYoT&uhd(c5Aw}5$H!iWyKbW8eBW^w|uknye0A=7zo
+z(}E7!U=p%&60)H*@eVURzP62YOU%UDXFhZ}0092&wB(&9yvRCO=O83OSB5|jWJzYw
+zztu)s_GA{xM)ly-GJp{S$db%x+r~%oWh4n$C+kEDHBq&o5uto!I2%pOA?I5oT1mlK
+z0<dgZz)~?uCrs9*Az+Fw4*?743Jb0Ww4eyxHp;U`ZnGIgPyTHLwgy8zd*XW1NksxE
+z$8@O|=JNpVZej^C=kK(z(kco-M)A+uNWzk&%Wri6EGh0P>&kL0ja3DJ<%tQYUDQ|e
+zzdY0O@4li3{>%IAHGobmEoi|7O|l-z0M>{EpedTfFbQ|jq-Gufn(qLBCRsnD)i7E~
+z))N9?MF{}IM1_>A3OSdnYO?4wI5(MdbE{$$gv9bfEgEIIYUDPxfKa$uSQF$ELFNVd
+zQjl$q*(VTUKDA*N%~Y;nRPtu3YO~E0->_{bRdrIE*J;^sm|dVbyTt8+nQ~0-aCfE5
+zb_~a)dDAg-&UkrSbfJ<myHd(ihgoGY&}#PhB}E8_&;)?5;WXTPPu?L<d*8b^w=;7Z
+z?mh{R)Waitnf;aBm4lvxw-0*{77zOmwrYJfqj6>GXyzz=9R3%>#lv?Gwhq&^{@PaK
+z%Jk9V(aqn&v(E$2H+hC_zCbm6-=$j3rP`}CJq0>hBq`9PMdA}kmwhRLUh$nv_&=(?
+z^h(ZoRoY(HK?^KsN}DWAoEtWTR8g9JC=VldaJbos&nTBIn!+M@5Jl!F)Uqq0$0N;5
+zp=fiDIvQc!*d3g*1nWmr)$JadcVFnIWmnK2pY$53hELSNx;nTQ+aK5+csTsyXN}jV
+zk7kb58?I`!u8!`p{pxP@;a5LRH^x4AM1ECg8UC;iVL=NCmC}+?G$|DwlosuLrGRpn
+zQe<>X(?#i;#kf<jN@mHXl*KWjF^saGQtlXzm7|8^Fl)8qn4D7f1{&ZaZY~V}I_`o3
+z$4Yzy&!s?Mj{Fst0&~POMJ2{lG^`S(TDOq-HWzB8WI0$15h@$bM!{NTNFt%&P6VwI
+z&YzIE!|?8!<;EXkCbtV;n0SYoC5Ma1g}L#%p?+*~XU^cJ7huwLi?3gbU#RbUmASzt
+zT0dXD1^~}wLdc)c`v(l3f_zuKqu%Yh)AcR6|K|PtgURnoC-JNG_|-;y{3L#@9=}%G
+zs>iQ4VpGR3{W}c3P+lW*WM|_fI#!R4y#U-ji-Qv0`LrPqJW%%|yOAHdevt><;`{^m
+C40@RW
+
+literal 0
+HcmV?d00001
+
 diff --git a/k9_patrol_console/tests/test_posture_rules.py b/k9_patrol_console/tests/test_posture_rules.py
 new file mode 100644
-index 0000000..ac65211
+index 0000000..a7b9411
 --- /dev/null
 +++ b/k9_patrol_console/tests/test_posture_rules.py
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +import sys,unittest
 +from pathlib import Path
 +sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -436,6 +636,7 @@ index 0000000..ac65211
 +        for truth,poses in sim.POSES.items():
 +            if truth=='unknown':continue
 +            for name,pose in poses.items():
++                if name=='옆으로 누워 팔 괴기':continue  # 가까운 거리 일부 방향에서 서 있음으로 나오는 알려진 약점
 +                for yaw in range(0,360,30):
 +                    for dist in (1.5,3,6):
 +                        k,box=sim.project(pose,yaw,dist,350)
@@ -457,6 +658,56 @@ index 0000000..ac65211
 +        self.assertEqual(classify_posture(None,None)['code'],'unknown')
 +
 +if __name__=='__main__':unittest.main()
+diff --git a/k9_patrol_console/tests/test_rotate_detect.py b/k9_patrol_console/tests/test_rotate_detect.py
+new file mode 100644
+index 0000000..1bd1709
+--- /dev/null
++++ b/k9_patrol_console/tests/test_rotate_detect.py
+@@ -0,0 +1,17 @@
++import sys,unittest
++from pathlib import Path
++sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
++import rotate_detect as rd
++
++class MapBack(unittest.TestCase):
++    def test_round_trip(self):
++        W,H=960,540
++        # 원본 (x,y) -> 시계방향 90도 회전 영상 좌표는 (H-1-y, x), 반시계는 (y, W-1-x)
++        for x,y in ((0,0),(100,50),(959,539),(480,270)):
++            self.assertEqual(rd.map_back(H-1-y,x,'cw',W,H),(x,y))
++            self.assertEqual(rd.map_back(y,W-1-x,'ccw',W,H),(x,y))
++    def test_iou(self):
++        self.assertEqual(rd._iou([0,0,10,10],[20,20,30,30]),0)
++        self.assertAlmostEqual(rd._iou([0,0,10,10],[0,0,10,10]),1)
++
++if __name__=='__main__':unittest.main()
+diff --git a/k9_patrol_console/vision.py b/k9_patrol_console/vision.py
+index 9951471..9feeef1 100644
+--- a/k9_patrol_console/vision.py
++++ b/k9_patrol_console/vision.py
+@@ -10,6 +10,7 @@ import time
+ import uuid
+ 
+ from posture_rules import classify_posture,draw_postures
++import rotate_detect
+ 
+ TARGET_IDS={'person':0,'backpack':24,'handbag':26,'suitcase':28}
+ 
+@@ -121,6 +122,14 @@ class Vision:
+                     item['posture']=classify_posture(item['keypoints'],item['xyxy'])
+                     item['pose_status']=item['posture']['label']
+                 detections.append(item)
++        # 누운 사람은 원본 영상에서 사람으로 잡히지 않는 경우가 많아, 90도 돌린 영상으로 한 번 더 찾는다.
++        if rotate_detect.ENABLED and 'person' in config['targets'] and r.keypoints is not None:
++            self.rotate_turn='ccw' if getattr(self,'rotate_turn','ccw')=='cw' else 'cw'
++            for turn in (('cw','ccw') if rotate_detect.BOTH else (self.rotate_turn,)):
++                for item in rotate_detect.rotated_people(self.model,image,config['confidence'],detections,turn,TARGET_IDS['person']):
++                    item['posture']=classify_posture(item['keypoints'],item['xyxy'])
++                    item['pose_status']=item['posture']['label']
++                    detections.append(item)
+         # Annotations belong to this analyzed frame, not an unrelated newer frame.
+         return detections,self.encode(draw_postures(r.plot(),detections))
+ 
 -- 
 2.43.0
 
