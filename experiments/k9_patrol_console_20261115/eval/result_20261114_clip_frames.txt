@@ -1,0 +1,60 @@
+clips 55 v2 {'unknown': 176, 'standing': 102, 'sitting': 12, 'lying': 4} 
+v3 {'unknown': 110, 'standing': 137, 'sitting': 38, 'lying': 9}
+[(('lying', 'lying'), 4), (('sitting', 'sitting'), 12), (('standing', 'standing'), 102), (('unknown', 'lying'), 5), (('unknown', 'sitting'), 26), (('unknown', 'standing'), 35), (('unknown', 'unknown'), 110)]
+106 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음
+2 몸통은 보이나 무릎·발목이 안 보임
+1 다리 한쪽이 서 있음과 앉음의 중간 값이라 단정하지 않음
+1 상체를 카메라 쪽으로 숙였거나 다리가 안 보여 누움으로 보기 어려움
+c896ff3f {'unknown': 3} -> {'unknown': 3}
+ff73b542 {'unknown': 5} -> {'unknown': 5}
+b66d437d {'unknown': 2} -> {'unknown': 2}
+9b016f3c {'unknown': 2} -> {'unknown': 2}
+55c51694 {'unknown': 1} -> {'unknown': 1}
+2a52ee57 {'standing': 4, 'unknown': 4} -> {'standing': 5, 'unknown': 3}
+bde5973b {'unknown': 7} -> {'standing': 7}
+272ea898 {'unknown': 7} -> {'standing': 7}
+e1c01537 {'sitting': 7, 'unknown': 3, 'standing': 2} -> {'sitting': 7, 'standing': 5}
+010177d8 {'unknown': 3, 'standing': 4} -> {'standing': 6, 'sitting': 1}
+b0a09b15 {'standing': 2, 'unknown': 5} -> {'standing': 2, 'sitting': 4, 'unknown': 1}
+af7170ef {'unknown': 1, 'standing': 6} -> {'standing': 7}
+0868ca6c {'unknown': 7} -> {'unknown': 7}
+311e31e3 {'standing': 6, 'unknown': 1} -> {'standing': 7}
+db8004e3 {'lying': 1, 'unknown': 3, 'sitting': 1} -> {'lying': 2, 'sitting': 3}
+8d0e62f5 {'standing': 2, 'unknown': 2} -> {'standing': 2, 'unknown': 2}
+eedf4695 {'unknown': 4, 'standing': 1} -> {'unknown': 1, 'standing': 4}
+3fab5a0f {'unknown': 1, 'standing': 6} -> {'standing': 7}
+e60c6e04 {'standing': 6, 'unknown': 2} -> {'standing': 8}
+b0591be9 {'standing': 7} -> {'standing': 7}
+a2a79722 {'standing': 6} -> {'standing': 6}
+7999cb96 {'standing': 4} -> {'standing': 4}
+f943e000 {'standing': 6} -> {'standing': 6}
+11544d3e {'standing': 8} -> {'standing': 8}
+a6aa678c {'lying': 3, 'unknown': 3} -> {'lying': 6}
+5154e432 {'unknown': 5} -> {'lying': 1, 'sitting': 4}
+052c3978 {'unknown': 1, 'standing': 5} -> {'sitting': 1, 'standing': 5}
+4c74342d {'standing': 7} -> {'standing': 7}
+0adbe814 {'unknown': 5, 'standing': 2} -> {'unknown': 2, 'sitting': 3, 'standing': 2}
+ef03d14d {'standing': 6} -> {'standing': 6}
+763161e3 {'unknown': 6, 'sitting': 1} -> {'sitting': 7}
+cd6cb459 {'sitting': 1, 'standing': 5} -> {'sitting': 1, 'standing': 5}
+fdfda863 {'unknown': 3} -> {'unknown': 1, 'standing': 2}
+8dbe6f45 {'sitting': 2, 'standing': 6, 'unknown': 5} -> {'sitting': 7, 'standing': 6}
+3b156d42 {'unknown': 5} -> {'unknown': 5}
+c2487b4c {'unknown': 4, 'standing': 1} -> {'standing': 5}
+afe15ef8 {'unknown': 4} -> {'unknown': 4}
+a1418699 {'unknown': 3} -> {'unknown': 3}
+2f8f72dd {'unknown': 1} -> {'unknown': 1}
+c1fe8101 {'unknown': 5} -> {'unknown': 5}
+55b01bf2 {'unknown': 5} -> {'unknown': 5}
+d6e3213d {'unknown': 4} -> {'unknown': 4}
+45f7ea57 {'unknown': 1} -> {'unknown': 1}
+ecf85b4a {'unknown': 4} -> {'unknown': 4}
+8210c891 {'unknown': 3} -> {'unknown': 3}
+7df5216d {'unknown': 10} -> {'unknown': 10}
+9db3d44f {'unknown': 7} -> {'unknown': 7}
+21a32d9a {'unknown': 7} -> {'unknown': 7}
+659b92eb {'unknown': 4} -> {'unknown': 4}
+9e964034 {'unknown': 7} -> {'unknown': 7}
+a8f20f4b {'unknown': 6} -> {'unknown': 6}
+be14691a {'unknown': 3} -> {'unknown': 3}
+1e6ac9a9 {'unknown': 2} -> {'standing': 1, 'unknown': 1}
