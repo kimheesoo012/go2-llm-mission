@@ -11,6 +11,25 @@ curl -L https://raw.githubusercontent.com/kimheesoo012/go2-llm-mission/feature/k
 
 되돌리기: `git reset --hard HEAD~1`
 
+### 도움 요청·알림까지 한 번에 적용 (v2)
+
+11/11의 도움 요청·알림 패치는 팀장님의 11/14 커밋 이후 `main`에 맞지 않아 다시 맞췄습니다. 자세 규칙 패치 위에 올라가므로 아래 한 줄로 둘을 순서대로 적용합니다.
+
+```bash
+B=https://raw.githubusercontent.com/kimheesoo012/go2-llm-mission/feature/k9-posture-rules-v3-20261115/experiments/k9_patrol_console_20261115
+curl -L $B/k9-posture-rules-v3.patch $B/k9-help-request-alerts-v2.patch | git am
+```
+
+되돌리기: `git reset --hard HEAD~3` (커밋 3개: 자세 규칙, 도움 요청·알림, 자세 안정화)
+
+`k9-help-request-alerts-v2.patch`에 들어 있는 것
+
+- 11/11 기능 그대로: 도움 요청 발화 판정, 누운 자세 15초 지속, 조종자 알림, 중요 기록 규칙 우선 선정, 순찰 보고서
+- 팀장님의 현재 코드에 맞춘 부분: `highlights.py`는 팀장님 현재 버전(11/05 구조)을 그대로 두고 규칙 우선 선정만 연결했습니다. 11/07의 선정 속도 개선(후보 선별 단계)은 넣지 않았습니다. 마이크 기능(`microphone.py`)과 충돌하지 않게 `app.py`, `static/index.html`을 합쳤습니다.
+- 새로 추가: `posture_smooth.py`. 한 장씩 판단해 프레임마다 결과가 바뀌는 것을 최근 1.5초의 결과로 안정시킵니다. 누워 있음이 2장 이상이면 누움을 우선합니다. `K9_POSTURE_SMOOTH=0`으로 끌 수 있습니다. 11/14 클립(0.5초 간격) 기준 같은 사람의 표시가 바뀐 횟수 20 → 11.
+
+확인한 것: 테스트 148개 통과, 두 패치를 팀장님 `main`에 순서대로 적용, 11/14 기록 98건이 든 DB로 콘솔을 띄워 상태·기록·보고서·중요 기록 선정 API와 화면 로딩 확인(Ollama 없이, 규칙 문장으로 대체되는 경로). 실제 Go2 연결과 실제 LLM으로는 확인하지 못했습니다.
+
 바뀌는 파일은 `posture_rules.py`와 `vision.py`(infer 함수에 7줄 추가)이고, `rotate_detect.py`와 점검용 파일 4개(`eval/posture_sim.py`, `eval/posture_eval_20261114.py`, `tests/test_posture_rules.py`, `tests/test_rotate_detect.py`)가 추가됩니다.
 `classify_posture(keypoints, box)` 호출 방식과 결과 형식(code, label, reason, metrics)은 그대로입니다.
 
