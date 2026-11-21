@@ -17,8 +17,7 @@ curl -L https://raw.githubusercontent.com/kimheesoo012/go2-llm-mission/feature/k
 | 항목 | 내용 | 설정 |
 |---|---|---|
 | FPS 표시·기록 | 탐지 상태 칸에 `처리 N FPS · N ms/장 · 회전 N%` 표시. `data/perf_log.csv`에 10초마다 한 줄 기록 | 자동 |
-| 회전 검출 조건 | `always` 매 프레임 / `unknown` 자세가 판단 불가인 사람이 있을 때만 / `unknown_or_empty` 판단 불가이거나 사람이 아무도 안 잡혔을 때 (기본) | `K9_ROTATE_WHEN` |
-| 회전 검출 켬·끔 | `0` 끔 / `1` 켬 (기본) | `K9_ROTATE_DETECT` |
+| 회전 검출 설정 | 끔 / 판단 불가일 때만 / 판단 불가·사람 없을 때 (기본) / 매 프레임 / 매 프레임 양방향. 바꾸면 FPS 측정을 새로 시작 | **관제 화면 설정창 → 「누운 사람 회전 검출」 → 관찰 설정 적용** (시작값은 `K9_ROTATE_DETECT`, `K9_ROTATE_WHEN`) |
 | 다리만 보일 때 | 판단 불가가 기본 (11/17 팀 결정) | `K9_SHIN_ONLY=1`이면 이전처럼 서 있음 |
 | STT 단어 힌트 | 비워 두면 기존과 같음 | `K9_STT_HOTWORDS` |
 
@@ -28,16 +27,14 @@ curl -L https://raw.githubusercontent.com/kimheesoo012/go2-llm-mission/feature/k
 
 ### 1. FPS 측정 (촬영 시작 전, 각 2분)
 
-콘솔을 끄고 아래 설정으로 다시 켠 뒤, 사람이 화면에 있는 상태로 2분씩 둡니다. 결과는 `data/perf_log.csv`에 설정과 함께 남습니다.
+관제 화면 설정창(톱니바퀴)의 「누운 사람 회전 검출」을 바꾸고 「관찰 설정 적용」을 누른 뒤, 사람이 화면에 있는 상태로 2분씩 둡니다. 콘솔을 다시 켤 필요는 없습니다. 탐지 상태 칸에 FPS가 표시되고, `data/perf_log.csv`에 설정 이름과 함께 10초마다 기록됩니다.
 
-| 순서 | 실행 설정 |
-|---|---|
-| ① 회전 끔 | `K9_ROTATE_DETECT=0` |
-| ② 회전 매 프레임 | `K9_ROTATE_WHEN=always` |
-| ③ 판단 불가·사람 없음일 때만 | `K9_ROTATE_WHEN=unknown_or_empty` |
-| ④ 판단 불가일 때만 | `K9_ROTATE_WHEN=unknown` |
+1. 끔
+2. 매 프레임
+3. 판단 불가·사람 없을 때 (기본)
+4. 판단 불가일 때만 (교수님 제안)
 
-예: `K9_ROTATE_DETECT=0 python app.py` (평소 실행 명령 앞에 붙임). ③으로 실시간이 괜찮으면 촬영은 ③으로 합니다.
+3번으로 실시간이 괜찮으면 촬영은 3번으로 합니다.
 
 ### 2. 자세 촬영 (거리 2 m·4 m, 각 5초 이상)
 
