@@ -1,0 +1,67 @@
+c896ff3f 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+ff73b542 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+b66d437d 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+9b016f3c 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+55c51694 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+2a52ee57 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+2a52ee57 1 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+bde5973b 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+272ea898 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+e1c01537 0 정답 sitting | 촬영 때 sitting | 현재 sitting | 몸통은 세워져 있고 무릎이 골반 높이 근처에 있음 (의자·쪼그려 앉은 형태)
+010177d8 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+b0a09b15 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+af7170ef 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+0868ca6c 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+311e31e3 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+db8004e3 0 정답 lying | 촬영 때 lying | 현재 lying | 몸통이 가로로 놓였고 몸 전체가 낮고 길게 보임
+8d0e62f5 0 정답 ? | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+eedf4695 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+3fab5a0f 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+e60c6e04 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+b0591be9 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+a2a79722 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+7999cb96 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+f943e000 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+11544d3e 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+a6aa678c 0 정답 lying | 촬영 때 lying | 현재 lying | 몸통이 가로로 놓였고 몸 전체가 낮고 길게 보임
+5154e432 0 정답 lying | 촬영 때 unknown | 현재 lying | 어깨가 골반보다 아래에 보이고 다리가 그 뒤로 이어짐 (머리가 카메라 쪽)
+052c3978 0 정답 sitting | 촬영 때 sitting | 현재 sitting | 몸통은 세워져 있고 무릎이 골반 높이 근처에 있음 (의자·쪼그려 앉은 형태)
+4c74342d 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+0adbe814 0 정답 sitting | 촬영 때 unknown | 현재 lying | 몸통이 바닥에서 절반 이하로만 일어서 있고 다리도 낮게 있음 (비스듬히 누운 형태)
+ef03d14d 0 정답 standing | 촬영 때 standing | 현재 standing | 몸통이 세워져 있고 골반이 발목보다 충분히 높으며 무릎이 그 중간에 있음
+763161e3 0 정답 sitting | 촬영 때 unknown | 현재 sitting | 몸통은 세워져 있고 발목이 골반 높이 근처에 있음 (바닥에 앉은 형태)
+cd6cb459 0 정답 sitting | 촬영 때 sitting | 현재 sitting | 몸통은 세워져 있고 무릎이 골반 높이 근처에 있음 (의자·쪼그려 앉은 형태)
+fdfda863 0 정답 standing | 촬영 때 standing | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+8dbe6f45 0 정답 sitting | 촬영 때 sitting | 현재 sitting | 몸통은 세워져 있고 무릎이 골반 높이 근처에 있음 (의자·쪼그려 앉은 형태)
+8dbe6f45 1 정답 standing | 촬영 때 unknown | 현재 standing | 상체가 화면 밖 · 골반 아래로 다리가 길게 내려옴 (하체 기준)
+3b156d42 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+c2487b4c 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+afe15ef8 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+a1418699 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+2f8f72dd 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음
+5b860392 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+c1fe8101 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+55b01bf2 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+d6e3213d 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+002bbf10 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+45f7ea57 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+ecf85b4a 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+8210c891 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+7df5216d 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+9db3d44f 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+21a32d9a 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+659b92eb 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+9e964034 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음
+a8f20f4b 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+be14691a 0 정답 part | 촬영 때 unknown | 현재 unknown | 너무 가깝거나 일부만 보여 몸통·다리 관절을 못 찾음 · 화면 위쪽 끝까지 닿아 있어 바닥에 누운 자세로 보기는 어려움
+1e6ac9a9 0 정답 standing | 촬영 때 unknown | 현재 standing | 가까워서 다리만 보임 · 정강이가 세로로 길게 서 있음 (골반 미확인, 약한 근거)
+('촬영 때', '?') {'standing': 1}
+('촬영 때', 'lying') {'lying': 2, 'unknown': 1}
+('촬영 때', 'part') {'unknown': 26}
+('촬영 때', 'sitting') {'sitting': 4, 'unknown': 2}
+('촬영 때', 'standing') {'standing': 14, 'unknown': 7}
+('현재 규칙', '?') {'standing': 1}
+('현재 규칙', 'lying') {'lying': 3}
+('현재 규칙', 'part') {'unknown': 26}
+('현재 규칙', 'sitting') {'sitting': 5, 'lying': 1}
+('현재 규칙', 'standing') {'standing': 21}

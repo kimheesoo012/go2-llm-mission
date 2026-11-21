@@ -1,0 +1,682 @@
+From a56b1ff5d0b662fb8e02c902f910e35e4ae7047a Mon Sep 17 00:00:00 2001
+From: hs <hs@users.noreply.github.com>
+Date: Sat, 21 Nov 2026 10:09:10 +0900
+Subject: [PATCH] =?UTF-8?q?11/21=20=EC=B4=AC=EC=98=81=20=EC=A4=80=EB=B9=84?=
+ =?UTF-8?q?:=20FPS=20=EC=B8=A1=EC=A0=95,=20=ED=9A=8C=EC=A0=84=20=EA=B2=80?=
+ =?UTF-8?q?=EC=B6=9C=20=EC=A1=B0=EA=B1=B4,=20=EB=8B=A4=EB=A6=AC=EB=A7=8C?=
+ =?UTF-8?q?=20=EB=B3=B4=EC=9D=B4=EB=A9=B4=20=ED=8C=90=EB=8B=A8=20=EB=B6=88?=
+ =?UTF-8?q?=EA=B0=80,=20STT=20=EB=8B=A8=EC=96=B4=20=ED=9E=8C=ED=8A=B8=20?=
+ =?UTF-8?q?=EC=98=B5=EC=85=98?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- perf_meter.py: 탐지 처리 FPS·한 장 처리 시간·회전 검출 비율을 화면에 표시하고
+  data/perf_log.csv 에 10초마다 기록 (회전 검출 켬/끔 비교용)
+- 회전 검출 설정을 관제 화면 설정창(누운 사람 회전 검출)에서 고름: 끔 / 판단 불가일 때만 / 판단 불가·사람 없을 때(기본) / 매 프레임 / 매 프레임 양방향. 바꾸면 FPS 측정을 새로 시작
+  11/14 영상 기준 unknown 만 돌리면 누움 판단 23→10, unknown_or_empty 는 23 유지
+- posture_rules: 다리만 보일 때 판단 불가가 기본값 (11/17 팀 결정, K9_SHIN_ONLY=1로 이전 동작)
+- STT 구조 요청 단어 힌트를 관제 화면 설정창(음성 기록 → 구조 요청 단어 힌트)에서 입력·적용. 비우면 힌트 없음(기본), 녹음 기록에 사용한 힌트를 함께 저장
+- eval/stt_hotwords_ab.py: 같은 녹음으로 힌트 전후 비교, 일상 발화 오탐 집계
+- eval/score_shoot.py: 새 촬영 영상 정답지 만들기·채점 (회전 켬/끔 함께)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015zvNx2eaFPw5XYvCk8ehkf
+---
+ k9_patrol_console/eval/score_shoot.py         | 113 ++++++++++++++++++
+ k9_patrol_console/eval/stt_hotwords_ab.py     |  85 +++++++++++++
+ .../eval/stt_labels_20261114.csv              |  21 ++++
+ k9_patrol_console/perf_meter.py               |  53 ++++++++
+ k9_patrol_console/posture_rules.py            |   5 +-
+ k9_patrol_console/rotate_detect.py            |  38 ++++++
+ k9_patrol_console/speech.py                   |  17 ++-
+ k9_patrol_console/static/index.html           |  16 ++-
+ k9_patrol_console/tests/test_perf_rotate.py   |  46 +++++++
+ k9_patrol_console/tests/test_posture_rules.py |   3 +-
+ k9_patrol_console/vision.py                   |  19 ++-
+ 11 files changed, 399 insertions(+), 17 deletions(-)
+ create mode 100644 k9_patrol_console/eval/score_shoot.py
+ create mode 100644 k9_patrol_console/eval/stt_hotwords_ab.py
+ create mode 100644 k9_patrol_console/eval/stt_labels_20261114.csv
+ create mode 100644 k9_patrol_console/perf_meter.py
+ create mode 100644 k9_patrol_console/tests/test_perf_rotate.py
+
+diff --git a/k9_patrol_console/eval/score_shoot.py b/k9_patrol_console/eval/score_shoot.py
+new file mode 100644
+index 0000000..f6ff2f9
+--- /dev/null
++++ b/k9_patrol_console/eval/score_shoot.py
+@@ -0,0 +1,113 @@
++"""새 촬영 영상으로 자세 판별을 다시 채점한다 (최종 수치용).
++
++1단계 (판별·정답지 만들기)
++  python eval/score_shoot.py frames --date 2026-11-21 --out eval/shoot_20261121
++  - 그날 저장된 클립을 0.5초 간격으로 콘솔과 같은 방식(포즈 모델 + 영상 회전 + 자세 규칙)으로 판별
++  - 사람마다 관절을 그린 사진(sheets/*.jpg)과 정답지 labels.csv 를 만든다.
++    labels.csv 의 truth 칸에 사진을 보고 standing / sitting / lying / part(너무 가깝거나 일부만) 를 적는다.
++2단계 (채점)
++  python eval/score_shoot.py score --out eval/shoot_20261121
++  - 정답별로 판별 결과를 세어 result.md 로 쓴다. 회전 검출을 켠 결과와 끈 결과를 함께 보인다.
++정답은 판별 결과를 보기 전에 사진만 보고 적는다(sheets 에는 판별 결과를 쓰지 않는다).
++"""
++import argparse
++import collections
++import csv
++import json
++import sqlite3
++import sys
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++sys.path.insert(0, str(ROOT))
++from posture_rules import classify_posture  # noqa: E402
++import rotate_detect  # noqa: E402
++
++EDGES = [(5, 7), (7, 9), (6, 8), (8, 10), (5, 6), (11, 12), (5, 11), (6, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
++
++
++def frames(a):
++    import cv2
++    import numpy as np
++    from ultralytics import YOLO
++    out = Path(a.out); (out / 'sheets').mkdir(parents=True, exist_ok=True)
++    model = YOLO(str(ROOT / a.model))
++    db = sqlite3.connect(ROOT / 'data' / 'records.sqlite3')
++    clips = db.execute("select id,clip from records where time like ? and (clip like '%.avi' or clip like '%.mp4') order by time",
++                       (a.date + '%',)).fetchall()
++    rows, tiles = [], []
++    for rid, clip in clips:
++        cap = cv2.VideoCapture(str(ROOT / 'data' / 'media' / Path(clip).name))
++        fps = cap.get(cv2.CAP_PROP_FPS) or 10
++        step, i = max(1, round(fps * a.step)), 0
++        while True:
++            ok, im = cap.read()
++            if not ok:
++                break
++            if i % step == 0:
++                r = model.predict(im, conf=.45, classes=[0], imgsz=512, verbose=False)[0]
++                dets = []
++                if r.boxes is not None and r.keypoints is not None:
++                    for j, b in enumerate(r.boxes):
++                        dets.append(dict(src='original', xyxy=[float(v) for v in b.xyxy[0].tolist()],
++                                         keypoints=r.keypoints.data[j].tolist()))
++                for d in dets:
++                    d['posture'] = classify_posture(d['keypoints'], d['xyxy'])
++                if rotate_detect.should_run([dict(target='person', posture=d['posture']) for d in dets], a.when):
++                    for turn in ('cw', 'ccw'):
++                        for d in rotate_detect.rotated_people(model, im, .45, dets, turn):
++                            d['src'] = 'rotated'; d['posture'] = classify_posture(d['keypoints'], d['xyxy']); dets.append(d)
++                for k, d in enumerate(dets):
++                    name = f'{rid[:8]}_{i:04d}_{k}'
++                    rows.append(dict(id=name, clip=rid[:8], frame=i, src=d['src'], pred=d['posture']['code'],
++                                     pred_label=d['posture']['label'], truth=''))
++                    t = cv2.resize(im.copy(), (480, 270)); s = 480 / im.shape[1]
++                    x0, y0, x1, y1 = [int(v * s) for v in d['xyxy']]
++                    cv2.rectangle(t, (x0, y0), (x1, y1), (0, 200, 255), 2)
++                    for u, v in EDGES:
++                        p, q = d['keypoints'][u], d['keypoints'][v]
++                        if p[2] >= .45 and q[2] >= .45:
++                            cv2.line(t, (int(p[0] * s), int(p[1] * s)), (int(q[0] * s), int(q[1] * s)), (80, 220, 80), 2)
++                    cv2.putText(t, name, (4, 16), 0, .5, (255, 255, 255), 2)
++                    tiles.append(t)
++            i += 1
++    for n in range(0, len(tiles), 20):
++        t = tiles[n:n + 20]; t += [np.zeros_like(t[0])] * (-len(t) % 4)
++        cv2.imwrite(str(out / 'sheets' / f'sheet_{n // 20:03d}.jpg'), np.vstack([np.hstack(t[k:k + 4]) for k in range(0, len(t), 4)]))
++    with open(out / 'labels.csv', 'w', newline='', encoding='utf-8') as f:
++        w = csv.DictWriter(f, fieldnames=['id', 'truth']); w.writeheader()
++        for r in rows:
++            w.writerow(dict(id=r['id'], truth=''))
++    (out / 'predictions.json').write_text(json.dumps(rows, ensure_ascii=False), encoding='utf-8')
++    print(f'클립 {len(clips)}개, 사람 검출 {len(rows)}건, 사진 {len(tiles)}장 → {out}')
++
++
++def score(a):
++    out = Path(a.out)
++    pred = {r['id']: r for r in json.loads((out / 'predictions.json').read_text(encoding='utf-8'))}
++    truth = {r['id']: r['truth'].strip() for r in csv.DictReader(open(out / 'labels.csv', encoding='utf-8-sig')) if r['truth'].strip()}
++    codes = ['standing', 'sitting', 'lying', 'unknown']
++    lines = ['# 새 촬영 영상 자세 판별 채점', '', f'- 정답이 적힌 사람 검출 {len(truth)}건', '']
++    for title, keep in (('회전 검출 켬', lambda r: True), ('회전 검출 끔 (원본 검출만)', lambda r: r['src'] == 'original')):
++        tab = collections.defaultdict(collections.Counter)
++        for k, t in truth.items():
++            if k in pred and keep(pred[k]):
++                tab[t][pred[k]['pred']] += 1
++        lines += [f'## {title}', '', '| 정답 \\ 판별 | 서 있음 | 앉음 | 누움 | 판단 불가 | 맞음 |', '|---|---|---|---|---|---|']
++        for t in ('standing', 'sitting', 'lying', 'part'):
++            c = tab[t]; n = sum(c.values())
++            ok = c['unknown'] if t == 'part' else c[t]
++            lines.append(f'| {t} ({n}) | ' + ' | '.join(str(c[x]) for x in codes) + f' | {ok} / {n} |')
++        lines.append('')
++    (out / 'result.md').write_text('\n'.join(lines), encoding='utf-8')
++    print('\n'.join(lines))
++
++
++if __name__ == '__main__':
++    ap = argparse.ArgumentParser()
++    ap.add_argument('step_name', choices=['frames', 'score'])
++    ap.add_argument('--date', default='2026-11-21'); ap.add_argument('--out', default='eval/shoot_20261121')
++    ap.add_argument('--model', default='yolo11n-pose.pt'); ap.add_argument('--step', type=float, default=.5)
++    ap.add_argument('--when', default='always', help='채점용 회전 검출 조건 (기본: 매 프레임)')
++    a = ap.parse_args()
++    frames(a) if a.step_name == 'frames' else score(a)
+diff --git a/k9_patrol_console/eval/stt_hotwords_ab.py b/k9_patrol_console/eval/stt_hotwords_ab.py
+new file mode 100644
+index 0000000..4062cb6
+--- /dev/null
++++ b/k9_patrol_console/eval/stt_hotwords_ab.py
+@@ -0,0 +1,85 @@
++"""STT 구조 요청 단어 힌트(hotwords) 적용 전후 비교.
++
++같은 녹음을 콘솔과 같은 설정(faster-whisper, cpu int8, beam 5, VAD 켬)으로
++hotwords 없이 / 있게 두 번 전사하고, 도움 요청 판정(help_request.py) 결과를 비교한다.
++
++정답은 labels CSV(file, truth, said)로 준다. truth: help(구조 요청을 말함) / daily(일상 발화) / unknown.
++  - 구조 요청 인식: truth=help 녹음 중 판정이 help 인 수
++  - 오탐: truth=daily 녹음 중 판정이 help 또는 suspect 인 수 (일상 발화를 도움 요청으로 잘못 잡음)
++사용: python eval/stt_hotwords_ab.py WAV_DIR LABELS.csv [--model small] [--out result.md]
++"""
++import argparse
++import csv
++import sys
++import time
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parent.parent
++sys.path.insert(0, str(ROOT))
++from help_request import find_help_request  # noqa: E402
++
++HOTWORDS = '살려주세요 도와주세요 구해주세요 살려줘 도와줘'
++
++
++def load(path):
++    import wave
++    import numpy as np
++    with wave.open(str(path), 'rb') as w:
++        if w.getnchannels() == 1 and w.getsampwidth() == 2 and w.getframerate() == 16000:
++            return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
++    return str(path)
++
++
++def run(model, audio, hot):
++    t = time.time()
++    segs, _ = model.transcribe(audio, language='ko', task='transcribe', beam_size=5, vad_filter=True,
++                               condition_on_previous_text=False, hotwords=hot)
++    text = '\n'.join(s.text.strip() for s in segs if s.text.strip())
++    return text, time.time() - t
++
++
++def level(text):
++    r = find_help_request(text)
++    return r.get('code', 'none')
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument('wav_dir'); ap.add_argument('labels')
++    ap.add_argument('--model', default='small'); ap.add_argument('--hotwords', default=HOTWORDS)
++    ap.add_argument('--out', default='stt_hotwords_result.md')
++    a = ap.parse_args()
++    from faster_whisper import WhisperModel
++    model = WhisperModel(a.model, device='cpu', compute_type='int8', cpu_threads=2)
++    rows = list(csv.DictReader(open(a.labels, encoding='utf-8-sig')))
++    out = []
++    for r in rows:
++        p = Path(a.wav_dir) / r['file']
++        if not p.exists():
++            print('없음', p); continue
++        audio = load(p)
++        t0, s0 = run(model, audio, None)
++        t1, s1 = run(model, audio, a.hotwords)
++        out.append(dict(file=r['file'], truth=r['truth'], said=r.get('said', ''), before=t0, after=t1,
++                        lv0=level(t0), lv1=level(t1), sec0=s0, sec1=s1))
++        print(r['file'][:8], r['truth'], '|', t0.replace('\n', ' / '), '→', t1.replace('\n', ' / '))
++
++    def count(truth, levels):
++        return sum(1 for o in out if o['truth'] == truth and o[levels] in ('help',)), \
++               sum(1 for o in out if o['truth'] == truth and o[levels] in ('help', 'suspect'))
++    nh = sum(o['truth'] == 'help' for o in out); nd = sum(o['truth'] == 'daily' for o in out)
++    lines = ['# STT 단어 힌트 적용 전후 비교', '',
++             f'- 모델 {a.model}, hotwords: `{a.hotwords}`', f'- 녹음 {len(out)}개 (구조 요청 {nh}, 일상 발화 {nd}, 미분류 {len(out)-nh-nd})', '',
++             '| 항목 | 적용 전 | 적용 후 |', '|---|---|---|',
++             f'| 구조 요청 녹음 중 도움 요청 판정 | {count("help","lv0")[0]} / {nh} | {count("help","lv1")[0]} / {nh} |',
++             f'| 일상 발화를 도움 요청·의심으로 잘못 잡음 | {count("daily","lv0")[1]} / {nd} | {count("daily","lv1")[1]} / {nd} |',
++             f'| 평균 전사 시간 (초) | {sum(o["sec0"] for o in out)/max(len(out),1):.2f} | {sum(o["sec1"] for o in out)/max(len(out),1):.2f} |',
++             '', '| 녹음 | 정답 | 실제 발화 | 적용 전 | 판정 | 적용 후 | 판정 |', '|---|---|---|---|---|---|---|']
++    for o in out:
++        lines.append(f"| {o['file'][:8]} | {o['truth']} | {o['said']} | {o['before'].replace(chr(10),' / ')} | {o['lv0']} | {o['after'].replace(chr(10),' / ')} | {o['lv1']} |")
++    Path(a.out).write_text('\n'.join(lines) + '\n', encoding='utf-8')
++    print('\n'.join(lines[:10]))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/k9_patrol_console/eval/stt_labels_20261114.csv b/k9_patrol_console/eval/stt_labels_20261114.csv
+new file mode 100644
+index 0000000..9656f6a
+--- /dev/null
++++ b/k9_patrol_console/eval/stt_labels_20261114.csv
+@@ -0,0 +1,21 @@
++file,truth,said
++0e6540175be440388d921bd6e7a9c476.wav,help,살려주세요 (11/11 보고: 사랑해주세요로 오인식)
++81e320cb468d4f2a87809e1fadd74291.wav,help,살려주세요 (11/05 시연)
++cae786e6deec4795b8b4834b7cd76159.wav,unknown,
++46e531123a754dce8d10ba015bc82bf4.wav,unknown,
++45eaca53f508483189f07b8c26310e9e.wav,unknown,
++5661e02707a7406b8485a8d70d8ece18.wav,unknown,
++7da50901964d41c39141a7f68fa385c1.wav,unknown,
++ac9e59b2b28e4cdd8c8ff55b5939eb1a.wav,unknown,
++3e5a22e87351447fba5ca47c36bd8f32.wav,unknown,
++4070b9153dd442d4bf0506a287e358e2.wav,unknown,
++419e274a0e7d42afb7f81e7aebdaeebb.wav,unknown,
++814eff1d253a43f39e28210940cd5607.wav,unknown,
++6502826252c9448e9b8f94b99eab5a59.wav,unknown,
++251ce35069dd43148a22ac423217827d.wav,unknown,
++624db882cae74b0fba6077b35237eec4.wav,unknown,
++7f6c88f532ff46cc8a73781ba151a8ab.wav,unknown,
++94b96741cfcc416a88ea7d5d105931b0.wav,unknown,
++005feba8ec5e412484639945c0667585.wav,unknown,
++5f30d04ac073469ea5b0d0663abbc509.wav,unknown,
++67c9b3ed2cf749218435674b2b044bc2.wav,help,도와 x3 (팀 노션 11/15)
+diff --git a/k9_patrol_console/perf_meter.py b/k9_patrol_console/perf_meter.py
+new file mode 100644
+index 0000000..793398f
+--- /dev/null
++++ b/k9_patrol_console/perf_meter.py
+@@ -0,0 +1,53 @@
++"""탐지 처리 속도(FPS) 측정과 기록.
++
++최근 window 초 동안 탐지 결과가 나온 프레임 수로 FPS를 계산하고, 한 장 처리 시간과
++회전 검출이 돈 비율을 함께 본다. root 가 주어지면 10초마다 root/perf_log.csv 에 한 줄씩 남긴다
++(회전 검출 설정이 함께 적히므로 켬/끔 비교에 그대로 쓴다).
++"""
++import collections
++import csv
++import os
++import time
++from datetime import datetime
++
++
++class PerfMeter:
++    def __init__(self, root=None, window=10., log_every=10.):
++        self.window, self.log_every = window, log_every
++        self.samples = collections.deque()   # (time, infer_seconds, rotated)
++        self.path = None if root is None else os.path.join(str(root), 'perf_log.csv')
++        self.last_log = None
++
++    def reset(self):
++        self.samples.clear()
++
++    def add(self, now, infer_seconds, rotated, setting=''):
++        self.setting = setting
++        self.samples.append((now, infer_seconds, bool(rotated)))
++        while self.samples and self.samples[0][0] < now - self.window:
++            self.samples.popleft()
++        if self.path and (self.last_log is None or now - self.last_log >= self.log_every) and len(self.samples) >= 2:
++            self.last_log = now
++            self._log()
++
++    def summary(self):
++        if len(self.samples) < 2:
++            return dict(fps=0., infer_ms=0., rotate_ratio=0., frames=len(self.samples))
++        span = self.samples[-1][0] - self.samples[0][0]
++        n = len(self.samples)
++        return dict(fps=round((n - 1) / span, 2) if span > 0 else 0.,
++                    infer_ms=round(1000 * sum(s[1] for s in self.samples) / n, 1),
++                    rotate_ratio=round(sum(s[2] for s in self.samples) / n, 2), frames=n)
++
++    def _log(self):
++        s = self.summary()
++        row = dict(time=datetime.now().isoformat(timespec='seconds'), rotate=getattr(self, 'setting', ''), **s)
++        new = not os.path.exists(self.path)
++        try:
++            with open(self.path, 'a', newline='', encoding='utf-8') as f:
++                w = csv.DictWriter(f, fieldnames=list(row))
++                if new:
++                    w.writeheader()
++                w.writerow(row)
++        except OSError:
++            pass
+diff --git a/k9_patrol_console/posture_rules.py b/k9_patrol_console/posture_rules.py
+index 3b801ec..11773ac 100644
+--- a/k9_patrol_console/posture_rules.py
++++ b/k9_patrol_console/posture_rules.py
+@@ -8,6 +8,7 @@ v2와 다른 점
+ 라벨은 자세 후보이며 낙상·의식·건강 상태를 뜻하지 않는다.
+ """
+ import math
++import os
+ 
+ LABELS = {'standing': '서 있음 후보', 'sitting': '앉아 있음 후보',
+           'lying': '누워 있음 후보', 'unknown': '판단 불가'}
+@@ -16,6 +17,8 @@ STAND_SHARE = .40   # 골반→발목 세로 길이 중 허벅지(골반→무
+ SIT_SHARE = .35
+ FLOOR_RATIO = .45
+ TOO_CLOSE_LABEL = '너무 가까움'
++# 다리만 보일 때 서 있음으로 볼지. 팀 결정(11/17): 사람이 봐도 애매하므로 판단 불가로 둔다.
++SHIN_ONLY = os.environ.get('K9_SHIN_ONLY', '0') == '1'
+ TORSO_PER_SHOULDER = 1.4   # 몸통 길이 / 어깨 너비 (성인 평균에 가까운 값)
+ LYING_ELEVATION = 45       # 몸통이 바닥에서 일어선 각도가 이 이하면 누움 쪽으로 본다
+ FORESHORTEN = .7   # 몸통 길이 / 어깨 너비가 이보다 작으면 몸통이 카메라 방향으로 놓인 것으로 본다   # 골반→발목 세로 길이 / 몸통 길이
+@@ -50,7 +53,7 @@ def torso_elevation(dx, dy, shoulder_w, ratio=TORSO_PER_SHOULDER):
+     return math.degrees(math.asin(math.sqrt(min(max(u, 0.), 1.))))
+ 
+ 
+-def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=True):
++def classify_posture(keypoints, box, min_conf=KEYPOINT_MIN, shin_only=SHIN_ONLY):
+     result = dict(code='unknown', label=LABELS['unknown'], reason='', metrics={},
+                   method='coco17_rules_v3.5', keypoint_threshold=min_conf)
+ 
+diff --git a/k9_patrol_console/rotate_detect.py b/k9_patrol_console/rotate_detect.py
+index 538b5a2..eab0cb6 100644
+--- a/k9_patrol_console/rotate_detect.py
++++ b/k9_patrol_console/rotate_detect.py
+@@ -8,12 +8,50 @@
+ K9_ROTATE_DETECT=1 (기본): 호출할 때마다 한쪽 방향만 돌린다(시계/반시계 번갈아). 추론 시간 약 2배.
+ K9_ROTATE_DETECT=2: 매번 양쪽 방향 모두 돌린다. 추론 시간 약 3배, 누운 사람을 가장 많이 잡는다.
+ K9_ROTATE_DETECT=0: 끔.
++
++언제 돌릴지 (K9_ROTATE_WHEN, 실시간이 버거울 때 줄이기 위함)
++  always   : 매 프레임 (기존 방식)
++  unknown  : 사람이 잡혔는데 자세가 판단 불가인 프레임만 ('너무 가까움'은 제외)
++  unknown_or_empty (기본): 위 경우 + 사람이 아무도 안 잡힌 프레임.
++             누운 사람은 원본에서 아예 검출되지 않는 경우가 많아(11/14 누운 27장 중 18장) 함께 돌린다.
+ """
+ import os
+ 
+ MODE = os.environ.get('K9_ROTATE_DETECT', '1')
+ ENABLED = MODE != '0'
+ BOTH = MODE == '2'
++WHEN = os.environ.get('K9_ROTATE_WHEN', 'unknown_or_empty')
++
++
++# 관제 화면에서 고르는 설정: 이름 -> (언제 돌릴지, 양쪽 방향 모두 돌릴지). when 이 None 이면 끔.
++SETTINGS = {
++    'off': (None, False),
++    'unknown': ('unknown', False),
++    'unknown_or_empty': ('unknown_or_empty', False),
++    'always': ('always', False),
++    'always_both': ('always', True),
++}
++
++
++def default_setting():
++    """환경 변수(K9_ROTATE_DETECT, K9_ROTATE_WHEN)로 정한 시작 설정. 화면에서 바꿀 수 있다."""
++    if not ENABLED:
++        return 'off'
++    if BOTH:
++        return 'always_both'
++    return WHEN if WHEN in SETTINGS else 'unknown_or_empty'
++
++
++def should_run(detections, when=None):
++    """이번 프레임에서 회전 검출을 돌릴지. detections: 원본 영상의 사람 검출(posture 포함)."""
++    when = when or WHEN
++    if when == 'always':
++        return True
++    people = [d for d in detections if d.get('target') == 'person']
++    if not people:
++        return when == 'unknown_or_empty'
++    return any(d.get('posture', {}).get('code') == 'unknown' and not d['posture'].get('metrics', {}).get('too_close')
++               for d in people)
+ 
+ 
+ def _iou(a, b):
+diff --git a/k9_patrol_console/speech.py b/k9_patrol_console/speech.py
+index f18dec0..c2c493e 100644
+--- a/k9_patrol_console/speech.py
++++ b/k9_patrol_console/speech.py
+@@ -4,6 +4,7 @@ Never starts recording on launch, reconnect, model change, or speaker pause.
+ import asyncio
+ from datetime import datetime, timezone
+ import json
++import os
+ import queue
+ import threading
+ import time
+@@ -21,11 +22,12 @@ class SpeechRecorder:
+         self.lock = threading.RLock()
+         self.info = dict(recording=False, receiving=False, busy=False, message='녹음 대기',
+                          error='', model='small', last_text='', queued=0, saved=0, elapsed_seconds=0,
+-                         max_seconds=MAX_SECONDS)
++                         max_seconds=MAX_SECONDS, hotwords=os.environ.get('K9_STT_HOTWORDS','').strip())
+         self.config_path = store.root / 'speech_config.json'
+         try:
+             config=json.loads(self.config_path.read_text(encoding='utf-8'))
+             if config.get('model') in ('base','small','medium'):self.info['model']=config['model']
++            if isinstance(config.get('hotwords'),str):self.info['hotwords']=config['hotwords'].strip()
+         except (OSError,ValueError):pass
+         self.conn = None
+         self.generation = 0
+@@ -61,9 +63,12 @@ class SpeechRecorder:
+     def configure(self, data):
+         model=data.get('model','small')
+         if model not in ('base','small','medium'):raise ValueError('STT 모델을 확인하세요.')
++        hot=data.get('hotwords',self.info.get('hotwords',''))
++        if not isinstance(hot,str) or len(hot)>200:raise ValueError('단어 힌트는 200자 이하로 입력하세요.')
++        hot=' '.join(hot.split())
+         if self.status()['recording'] or self.status()['busy']:raise ValueError('녹음·변환 종료 후 모델을 변경하세요.')
+-        self.config_path.write_text(json.dumps(dict(model=model,mode='manual')),encoding='utf-8')
+-        self.update(model=model,error='')
++        self.config_path.write_text(json.dumps(dict(model=model,mode='manual',hotwords=hot),ensure_ascii=False),encoding='utf-8')
++        self.update(model=model,hotwords=hot,error='')
+ 
+     async def attach(self, conn):
+         self.conn=conn
+@@ -137,7 +142,7 @@ class SpeechRecorder:
+             session=self.vision.session
+         meta=dict(event_kind='speech',source='robot_microphone',record_mode='manual',
+                   started_at=self.started_at,ended_at=datetime.now(timezone.utc).isoformat(),
+-                  model=self.info['model'],duration_seconds=round(len(self.pcm)/32000,3),
++                  model=self.info['model'],stt_hotwords=self.info.get('hotwords',''),duration_seconds=round(len(self.pcm)/32000,3),
+                   stop_reason=reason,transcript='',segments=[],speaker='미확인',position_status='미수신',
+                   timestamp_basis='PC reception estimate, not robot capture clock',snapshot_timing='녹음 종료 시점')
+         if self.sample_error:meta['capture_warning']=self.sample_error
+@@ -186,8 +191,10 @@ class SpeechRecorder:
+                 self.model=None;self.model_name=None
+                 self.model=WhisperModel(meta['model'],device='cpu',compute_type='int8',cpu_threads=2)
+                 self.model_name=meta['model']
++            # 구조 요청 단어 힌트 (관제 화면 음성 기록 칸에서 설정, 비우면 힌트 없음). 녹음 기록에 stt_hotwords 로 함께 남는다.
++            hot=meta.get('stt_hotwords') or None
+             segments,_=self.model.transcribe(str(path),language='ko',task='transcribe',
+-                                            beam_size=5,vad_filter=True,condition_on_previous_text=False)
++                                            beam_size=5,vad_filter=True,condition_on_previous_text=False,hotwords=hot)
+             meta['segments']=[dict(start_seconds=round(s.start,3),end_seconds=round(s.end,3),text=s.text.strip())
+                               for s in segments if s.text.strip()]
+             meta['transcript']='\n'.join(s['text'] for s in meta['segments'])
+diff --git a/k9_patrol_console/static/index.html b/k9_patrol_console/static/index.html
+index 50a9581..d2e5144 100644
+--- a/k9_patrol_console/static/index.html
++++ b/k9_patrol_console/static/index.html
+@@ -464,6 +464,8 @@ dialog::backdrop{background:rgba(10,15,25,.36);backdrop-filter:blur(2px)}
+     <select id="visionModel"><option value="yolo11n-pose.pt">자세 추정 · Nano</option><option value="yolo11s-pose.pt">자세 추정 · Small</option><option value="yolo11n.pt">사람 탐지 · Nano</option></select></div>
+    <label class="switch"><input checked="" name="target" type="checkbox" value="person"/>사람만 관찰</label>
+    <div class="range"><label for="confidence">탐지 점수 기준</label><input id="confidence" max="0.95" min="0.1" step="0.05" type="range" value="0.45"/><span id="confidenceValue">0.45</span></div>
++   <div class="field"><label for="rotateMode">누운 사람 회전 검출</label>
++    <select id="rotateMode"><option value="off">끔</option><option value="unknown">판단 불가일 때만</option><option value="unknown_or_empty">판단 불가·사람 없을 때</option><option value="always">매 프레임</option><option value="always_both">매 프레임 · 양방향</option></select></div>
+    <div class="sample" id="detectionStatus" role="status">탐지 모델 대기</div>
+    <label class="switch"><input checked="" id="autoCapture" type="checkbox"/> 사람 등장 시 전후 영상 저장</label>
+    <div class="range"><label for="cooldown">최소 저장 간격</label><select id="cooldown"><option value="5">5초</option><option selected="" value="10">10초</option><option value="30">30초</option></select></div>
+@@ -473,7 +475,9 @@ dialog::backdrop{background:rgba(10,15,25,.36);backdrop-filter:blur(2px)}
+    <h3>음성 기록</h3>
+    <div class="inline"><button class="primary" id="speechRecordSettings">녹음 시작</button>
+     <select id="speechModel" aria-label="STT 모델"><option value="base">STT Base · 가벼움</option><option value="small" selected>STT Small · 기본</option><option value="medium">STT Medium · 느림</option></select>
+-    <button id="speechApply">모델 적용</button></div>
++    <button id="speechApply">설정 적용</button></div>
++   <div class="field"><label for="speechHotwords">구조 요청 단어 힌트</label>
++    <div class="inline"><input id="speechHotwords" type="text" maxlength="200" placeholder="비워 두면 힌트 없음"/><button id="hotwordsPreset" type="button">기본 단어</button></div></div>
+    <p class="note" id="speechStatus" role="status">녹음 대기</p>
+    <p class="note">녹음 시작 → 종료·저장 → STT 자동 변환 · 최대 10분</p>
+   </section>
+@@ -535,7 +539,7 @@ document.querySelectorAll('[data-cmd]').forEach(b=>{b.disabled=true;b.onpointerd
+ const keys=['ShiftLeft','KeyW','KeyS','KeyA','KeyD','KeyQ','KeyE','Space'];document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT','BUTTON'].includes(e.target.tagName)||!keys.includes(e.code))return;e.preventDefault();if(e.code==='Space'){stop();return}held.add(e.code);send()});document.addEventListener('keyup',e=>{if(keys.includes(e.code)){held.delete(e.code);send()}});window.addEventListener('blur',stop);document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});window.addEventListener('pagehide',stop);$('stop').onclick=$('stop2').onclick=stop;$('speed').oninput=()=>{stop();$('speedValue').textContent=Number($('speed').value).toFixed(1)+' m/s'};
+ async function connect(){stop();try{await api('connect',{ip:$('robotIp').value.trim()});await refresh()}catch(e){toast(e.message)}}$('connect').onclick=$('connect2').onclick=connect;$('disconnect').onclick=async()=>{stop();$('disconnect').disabled=true;try{await api('disconnect',{});await refresh()}catch(e){toast(e.message)}};
+ document.querySelectorAll('[data-pose]').forEach(b=>{b.disabled=true;b.onclick=async()=>{stop();try{await api('pose',{name:b.dataset.pose});await refresh()}catch(e){toast(e.message)}}});
+-$('confidence').oninput=()=>$('confidenceValue').textContent=Number($('confidence').value).toFixed(2);$('applyConfig').onclick=async()=>{try{const targets=[...document.querySelectorAll('input[name=target]:checked')].map(i=>i.value);await api('config',{targets,model:$('visionModel').value,confidence:Number($('confidence').value),auto:$('autoCapture').checked,cooldown:Number($('cooldown').value)});toast('관찰 설정을 적용했습니다.')}catch(e){toast(e.message)}};
++$('confidence').oninput=()=>$('confidenceValue').textContent=Number($('confidence').value).toFixed(2);$('applyConfig').onclick=async()=>{try{const targets=[...document.querySelectorAll('input[name=target]:checked')].map(i=>i.value);await api('config',{targets,model:$('visionModel').value,confidence:Number($('confidence').value),auto:$('autoCapture').checked,cooldown:Number($('cooldown').value),rotate:$('rotateMode').value});toast('관찰 설정을 적용했습니다.')}catch(e){toast(e.message)}};
+ async function capture(withNote){try{await api('capture',withNote?{title:$('title').value.trim(),note:$('note').value.trim()+(advancedObservationEnabled()? '\n\n'+observationNote():''),keywords:$('keywords').value.trim()}:{});if(withNote){$('title').value='';$('note').value='';$('keywords').value=''}toast('기록 생성. 후속 3초 영상 수집 중입니다.');loadRecords()}catch(e){toast(e.message)}}$('capture').onclick=()=>capture(false);$('save').onclick=()=>capture(true);document.querySelectorAll('[data-tag]').forEach(b=>b.onclick=()=>{const tags=$('keywords').value.split(',').map(t=>t.trim()).filter(Boolean);if(!tags.includes(b.dataset.tag))tags.push(b.dataset.tag);$('keywords').value=tags.join(', ')});
+ function view(name){stop();const archive=name==='archive';$('live').classList.toggle('hidden',archive);$('archive').classList.toggle('hidden',!archive);$('liveTab').classList.toggle('active',!archive);$('recordsTab').classList.toggle('active',archive);if(archive)loadRecords();if(name==='report'){loadHistory();$('report').scrollIntoView({behavior:'smooth',block:'start'})}}
+ $('liveTab').onclick=()=>view('live');$('recordsTab').onclick=$('finish').onclick=()=>view('archive');$('reportTab').onclick=()=>view('report');
+@@ -624,7 +628,7 @@ async function loadHistory(){try{
+  h.forEach(r=>{const b=text('button',new Date(r.time).toLocaleString('ko-KR')+' · '+r.content.selected_count+'건','source');b.onclick=()=>showHighlights(r);$('summaryHistory').append(b)});
+ }catch(e){toast(e.message)}}
+ $('reportDownload').onclick=()=>{if(!highlightResult){toast('선정 결과가 없습니다.');return}download(new Blob([JSON.stringify(highlightResult,null,2)],{type:'application/json;charset=utf-8'}),'k9-important-records.json')};
+-async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;if(!connected&&micBroadcast)endMic("Go2 연결 끊김");refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);refreshAlerts(state.alerts);refreshReport(state.report);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지');$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;{const ev=all.slice(0,5),key=ev.map(x=>x.id+x.state).join();if($('events').dataset.key!==key){$('events').dataset.key=key;$('events').replaceChildren(...(ev.length?ev.map(x=>{const row=document.createElement('div');row.className='event '+(x.metadata?.event_kind==='speech'?'is-speech':'is-person');row.append(text('time',new Date(x.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),'event-t'),text('span',x.title,'event-title'));return row}):[text('p','이번 순찰에서 저장된 기록이 없습니다.','subject-empty')]))}}if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
++async function refresh(){try{state=await api('status');const r=state.robot,v=state.vision,l=state.llm;connected=r.connected;if(!connected&&micBroadcast)endMic("Go2 연결 끊김");refreshAudio(state.audio);refreshSpeech(state.speech);refreshPosture(v);refreshAlerts(state.alerts);refreshReport(state.report);$('badge').textContent=r.connecting?'연결 중':connected?'연결됨':'미연결';$('robotState').textContent=connected?r.mode:'미연결';$('connectionState').textContent=r.error||(connected?'WebRTC 연결 완료 · '+r.mode:r.connecting?'연결 중…':'연결 전');$('connect').disabled=$('connect2').disabled=r.connecting||connected;$('disconnect').disabled=r.connecting||(!connected&&!v.video);$('robotIp').disabled=r.connecting||connected;document.querySelectorAll('[data-cmd],[data-pose]').forEach(b=>b.disabled=!connected||r.pose_busy);$('capture').disabled=$('save').disabled=!v.video;const stale=!v.video;$('camera').style.visibility=stale?'hidden':'visible';$('videoWaiting').classList.toggle('hidden',!stale);$('detectionStatus').textContent=(v.perf&&v.perf.frames>1?'처리 '+v.perf.fps+' FPS · '+v.perf.infer_ms+'ms/장 · 회전 '+Math.round(v.perf.rotate_ratio*100)+'%\n':'')+(v.detector_error||(!v.detecting?'탐지 모델 준비 중':!v.video?'탐지 모델 준비됨 · 영상 대기':v.detections.length?v.detections.map(d=>(labels[d.target]||d.target)+' · '+d.confidence.toFixed(2)+(d.posture?' · '+d.posture.label:'')).join('\n'):'선택한 대상 미탐지'));$('notice').classList.toggle('error-visible',!!(v.video_error||v.record_error));if(v.video_error||v.record_error)$('notice').textContent=v.video_error||v.record_error;else $('notice').textContent='규칙 기반 자세 후보 표시 · 쓰러짐·위급 여부는 조종자가 확인하세요.';$('llmStatus').textContent=l.error||(l.busy?((l.progress||'기록 검토 중…')+' · '+(l.elapsed_seconds||0)+'초 경과'):l.result?'선정 완료 · 원본과 선택 이유를 확인하세요.':'관측 시각·발화 원문·사람 등장·자세 후보를 바탕으로 선정합니다.');$('generate').disabled=l.busy;if(l.result&&l.result.id!==reportResult){reportResult=l.result.id;showHighlights(l.result);loadHistory()}if(!connected){pointer=null;held.clear();wasMoving=false}$('clock').textContent=new Date().toLocaleString('ko-KR')+' · '+(v.video?'영상 수신':'영상 미수신');if(Date.now()-lastRecords>2500){lastRecords=Date.now();const all=await api('records?session='+encodeURIComponent(v.session));$('sessionCount').textContent=all.length;$('includedCount').textContent=all.filter(x=>!x.excluded).length;{const ev=all.slice(0,5),key=ev.map(x=>x.id+x.state).join();if($('events').dataset.key!==key){$('events').dataset.key=key;$('events').replaceChildren(...(ev.length?ev.map(x=>{const row=document.createElement('div');row.className='event '+(x.metadata?.event_kind==='speech'?'is-speech':'is-person');row.append(text('time',new Date(x.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),'event-t'),text('span',x.title,'event-title'));return row}):[text('p','이번 순찰에서 저장된 기록이 없습니다.','subject-empty')]))}}if(!$('archive').classList.contains('hidden')&&!document.querySelector('#records details[open]'))await loadRecords()}}catch(e){stop();connected=false;$('badge').textContent='서버 통신 끊김';$('connectionState').textContent='서버 접근 실패. 리모컨으로 정지를 확인하세요.'}}
+ 
+ function refreshPosture(v){
+  const e=$('postureLive'),people=v.video?v.detections.filter(d=>d.target==='person'):[];
+@@ -672,10 +676,10 @@ $('patrolDownload').onclick=()=>{if(patrolResult)download(new Blob([patrolResult
+ let speechSynced=false,lastSpeechSaved=null;
+ function refreshSpeech(s){
+  if(!s)return;
+- if(!speechSynced){$('speechModel').value=s.model;$('visionModel').value=state.vision.config.model;speechSynced=true}
++ if(!speechSynced){$('speechModel').value=s.model;$('speechHotwords').value=s.hotwords||'';$('visionModel').value=state.vision.config.model;$('rotateMode').value=state.vision.config.rotate||'unknown_or_empty';speechSynced=true}
+  const label=s.recording?'녹음 종료·저장':s.busy?'변환 중…':'녹음 시작';
+  for(const id of ['speechRecord','speechRecordSettings']){const button=$(id);button.textContent=label;button.disabled=s.busy||(!state?.robot.connected&&!s.recording);button.classList.toggle('stop',s.recording)}
+- $('speechApply').disabled=s.recording||s.busy;$('speechModel').disabled=s.recording||s.busy;
++ $('speechApply').disabled=s.recording||s.busy;$('speechModel').disabled=$('speechHotwords').disabled=s.recording||s.busy;
+  const elapsed=Math.floor(s.elapsed_seconds||0),clock=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+  $('recordingState').textContent=s.recording?'● 녹음 중 '+clock:s.busy?'STT 변환 중':s.error?'녹음 오류':s.message;
+  $('speechStatus').textContent=s.error||(s.recording?'녹음 중 '+clock+(s.receiving?' · 수신 중':' · 오디오 대기'):s.message);
+@@ -684,7 +688,7 @@ function refreshSpeech(s){
+  lastSpeechSaved=s.saved;
+ }
+ $('speechMenu').onclick=()=>{stop();$('settingsDialog').showModal();$('speechSettings').scrollIntoView({block:'start'})};
+-$('speechApply').onclick=async()=>{try{await api('speech/config',{model:$('speechModel').value});toast('STT 모델 적용');await refresh()}catch(e){toast(e.message)}};
++$('hotwordsPreset').onclick=()=>{$('speechHotwords').value='살려주세요 도와주세요 구해주세요 살려줘 도와줘'};$('speechApply').onclick=async()=>{try{await api('speech/config',{model:$('speechModel').value,hotwords:$('speechHotwords').value});toast($('speechHotwords').value.trim()?'STT 모델·단어 힌트 적용':'STT 모델 적용 · 단어 힌트 없음');await refresh()}catch(e){toast(e.message)}};
+ async function toggleRecording(){
+  $('speechRecord').disabled=$('speechRecordSettings').disabled=true;
+  try{const result=await api(state?.speech.recording?'speech/stop':'speech/start',{});if(result.ok===false)toast('수신된 음성이 없습니다.');await refresh()}
+diff --git a/k9_patrol_console/tests/test_perf_rotate.py b/k9_patrol_console/tests/test_perf_rotate.py
+new file mode 100644
+index 0000000..cc7e01e
+--- /dev/null
++++ b/k9_patrol_console/tests/test_perf_rotate.py
+@@ -0,0 +1,46 @@
++import sys
++from pathlib import Path
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++import rotate_detect as rd
++from perf_meter import PerfMeter
++
++
++def person(code, too_close=False):
++    return dict(target='person', posture=dict(code=code, metrics=dict(too_close=True) if too_close else {}))
++
++
++def test_should_run_modes():
++    assert rd.should_run([person('standing')], 'always')
++    assert not rd.should_run([person('standing')], 'unknown')
++    assert rd.should_run([person('standing'), person('unknown')], 'unknown')
++    assert not rd.should_run([person('unknown', too_close=True)], 'unknown')
++    assert not rd.should_run([], 'unknown')
++    assert rd.should_run([], 'unknown_or_empty')
++
++
++def test_perf_summary_and_log(tmp_path):
++    m = PerfMeter(tmp_path, window=10, log_every=0)
++    for i in range(11):
++        m.add(i * .5, .1, i % 2 == 0, 'always')
++    s = m.summary()
++    assert s['fps'] == 2.0 and s['infer_ms'] == 100.0 and 0.5 <= s['rotate_ratio'] <= 0.6
++    assert (tmp_path / 'perf_log.csv').read_text(encoding='utf-8').startswith('time,rotate,fps')
++
++
++def test_settings_and_default():
++    assert set(rd.SETTINGS) == {'off', 'unknown', 'unknown_or_empty', 'always', 'always_both'}
++    assert rd.default_setting() in rd.SETTINGS
++
++
++def test_speech_hotwords_config(tmp_path):
++    import types
++    import speech
++    store = types.SimpleNamespace(root=tmp_path, list=lambda: [])
++    rec = speech.SpeechRecorder(store, None, None)
++    assert rec.status()['hotwords'] == ''
++    rec.configure(dict(model='small', hotwords='  살려주세요   도와주세요 '))
++    assert rec.status()['hotwords'] == '살려주세요 도와주세요'
++    again = speech.SpeechRecorder(store, None, None)
++    assert again.status()['hotwords'] == '살려주세요 도와주세요'
++    rec.configure(dict(model='small', hotwords=''))
++    assert rec.status()['hotwords'] == ''
+diff --git a/k9_patrol_console/tests/test_posture_rules.py b/k9_patrol_console/tests/test_posture_rules.py
+index a7b9411..0c636e9 100644
+--- a/k9_patrol_console/tests/test_posture_rules.py
++++ b/k9_patrol_console/tests/test_posture_rules.py
+@@ -31,7 +31,8 @@ class Rules(unittest.TestCase):
+         self.assertEqual(r['code'],'unknown');self.assertIn('너무 가깝거나',r['reason']);self.assertEqual(r['label'],'너무 가까움')
+     def test_shin_only_can_be_turned_off(self):
+         k=kp({13:(662,208),14:(862,214),15:(628,495),16:(812,521)})
+-        self.assertEqual(classify_posture(k,[526,0,957,540])['code'],'standing')
++        self.assertEqual(classify_posture(k,[526,0,957,540])['code'],'unknown')  # 기본값: 판단 불가 (11/17 팀 결정)
++        self.assertEqual(classify_posture(k,[526,0,957,540],shin_only=True)['code'],'standing')
+         self.assertEqual(classify_posture(k,[526,0,957,540],shin_only=False)['code'],'unknown')
+     def test_bad_input(self):
+         self.assertEqual(classify_posture(None,None)['code'],'unknown')
+diff --git a/k9_patrol_console/vision.py b/k9_patrol_console/vision.py
+index 7951c55..3edf8fd 100644
+--- a/k9_patrol_console/vision.py
++++ b/k9_patrol_console/vision.py
+@@ -12,6 +12,7 @@ import uuid
+ from posture_rules import classify_posture,draw_postures
+ import rotate_detect
+ import posture_smooth
++from perf_meter import PerfMeter
+ from lying_tracker import LyingTracker
+ 
+ TARGET_IDS={'person':0,'backpack':24,'handbag':26,'suitcase':28}
+@@ -35,8 +36,9 @@ class Vision:
+         self.last_seen={}
+         self.start_seen={}
+         self.last_saved={}
+-        self.config=dict(model=os.environ.get('K9_YOLO_MODEL','yolo11n-pose.pt'),targets=['person'],confidence=.45,auto=True,cooldown=10,pre=3,post=3)
++        self.config=dict(model=os.environ.get('K9_YOLO_MODEL','yolo11n-pose.pt'),targets=['person'],confidence=.45,auto=True,cooldown=10,pre=3,post=3,rotate=rotate_detect.default_setting())
+         self.info=dict(video=False,detecting=False,detector_error='',video_error='',record_error='',detections=[],last_frame=0.,model_path=self.config['model'])
++        self.fps=PerfMeter(self.store.root if hasattr(self.store,'root') else None)
+         self.loop=None
+         self.tasks=[]
+         # Frame-level lying -> lying sustained for N seconds (default 15; lower it for a short demo).
+@@ -61,8 +63,11 @@ class Vision:
+         conf=float(data.get('confidence',.45));cool=float(data.get('cooldown',10))
+         if not .1<=conf<=.95 or not 3<=cool<=120:raise ValueError('설정 범위를 확인하세요.')
+         if not isinstance(data.get('auto',True),bool):raise ValueError('자동 저장 설정 오류')
++        rotate=data.get('rotate',self.config['rotate'])
++        if rotate not in rotate_detect.SETTINGS:raise ValueError('회전 검출 설정을 확인하세요.')
+         with self.lock:
+-            self.config.update(model=model,targets=targets,confidence=conf,cooldown=cool,auto=data.get('auto',True))
++            self.config.update(model=model,targets=targets,confidence=conf,cooldown=cool,auto=data.get('auto',True),rotate=rotate)
++            if rotate!=self.config.get('_rotate_measured'):self.fps.reset();self.config['_rotate_measured']=rotate
+             self.last_seen.clear();self.start_seen.clear()
+         if self.running and self.loop:self.loop.call_soon_threadsafe(self.restart_detector)
+ 
+@@ -129,9 +134,12 @@ class Vision:
+                     item['pose_status']=item['posture']['label']
+                 detections.append(item)
+         # 누운 사람은 원본 영상에서 사람으로 잡히지 않는 경우가 많아, 90도 돌린 영상으로 한 번 더 찾는다.
+-        if rotate_detect.ENABLED and 'person' in config['targets'] and r.keypoints is not None:
++        self.rotate_ran=False
++        when,both=rotate_detect.SETTINGS[config.get('rotate','unknown_or_empty')]
++        if when and 'person' in config['targets'] and r.keypoints is not None and rotate_detect.should_run(detections,when):
++            self.rotate_ran=True
+             self.rotate_turn='ccw' if getattr(self,'rotate_turn','ccw')=='cw' else 'cw'
+-            for turn in (('cw','ccw') if rotate_detect.BOTH else (self.rotate_turn,)):
++            for turn in (('cw','ccw') if both else (self.rotate_turn,)):
+                 for item in rotate_detect.rotated_people(self.model,image,config['confidence'],detections,turn,TARGET_IDS['person']):
+                     item['posture']=classify_posture(item['keypoints'],item['xyxy'])
+                     item['pose_status']=item['posture']['label']
+@@ -163,8 +171,11 @@ class Vision:
+                 if latest is None or latest[0]==previous:
+                     await asyncio.sleep(.03);continue
+                 previous,image=latest
++                t0=time.monotonic()
+                 det,jpg=await asyncio.to_thread(self.infer,image,config)
+                 now=time.monotonic()
++                self.fps.add(now,now-t0,getattr(self,'rotate_ran',False),config.get('rotate',''))
++                with self.lock:self.info['perf']=self.fps.summary()
+                 with self.lock:self.jpeg=jpg;self.info['detections']=det
+                 self.track_lying(now,det)
+                 seen={d['target'] for d in det}
+-- 
+2.43.0
+
